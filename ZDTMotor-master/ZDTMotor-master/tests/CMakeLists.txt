@@ -1,0 +1,71 @@
+cmake_minimum_required(VERSION 3.22)
+
+project(zdt_motor_tests LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(LIBXR_ROOT "" CACHE PATH "Path to the LibXR repository root")
+if(NOT LIBXR_ROOT)
+  get_filename_component(LIBXR_ROOT
+    "${CMAKE_CURRENT_LIST_DIR}/../../../Middlewares/Third_Party/LibXR" ABSOLUTE)
+endif()
+if(NOT EXISTS "${LIBXR_ROOT}/src/driver/can.cpp")
+  message(FATAL_ERROR "Set LIBXR_ROOT to a LibXR repository root")
+endif()
+
+add_executable(
+  zdt_motor_tests
+  ZDTMotorTest.cpp
+  ${LIBXR_ROOT}/src/driver/can.cpp
+  ${LIBXR_ROOT}/src/structure/lockfree_list.cpp
+)
+
+set(LIBXR_INCLUDE_DIRS
+  ${LIBXR_ROOT}/src
+  ${LIBXR_ROOT}/src/core
+  ${LIBXR_ROOT}/src/system
+  ${LIBXR_ROOT}/src/utils
+  ${LIBXR_ROOT}/src/structure
+  ${LIBXR_ROOT}/src/middleware
+  ${LIBXR_ROOT}/src/driver
+  ${LIBXR_ROOT}/system/none
+)
+file(GLOB LIBXR_CORE_DIRS LIST_DIRECTORIES true "${LIBXR_ROOT}/src/core/*")
+file(GLOB LIBXR_STRUCTURE_DIRS LIST_DIRECTORIES true
+  "${LIBXR_ROOT}/src/structure/*")
+file(GLOB LIBXR_MIDDLEWARE_DIRS LIST_DIRECTORIES true
+  "${LIBXR_ROOT}/src/middleware/*")
+list(APPEND LIBXR_INCLUDE_DIRS
+  ${LIBXR_CORE_DIRS} ${LIBXR_STRUCTURE_DIRS} ${LIBXR_MIDDLEWARE_DIRS})
+
+target_include_directories(zdt_motor_tests PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/..
+  ${LIBXR_INCLUDE_DIRS}
+)
+target_compile_definitions(zdt_motor_tests PRIVATE
+  LIBXR_SYSTEM_none=True
+  LIBXR_SINGLE_CORE=1
+  LIBXR_NO_EIGEN
+  LIBXR_DEFAULT_SCALAR=double
+  LIBXR_LOG_LEVEL=4
+  LIBXR_LOG_OUTPUT_LEVEL=4
+  XR_LOG_MESSAGE_MAX_LEN=64
+  LIBXR_PRINT_ENABLE_INTEGER=1
+  LIBXR_PRINT_ENABLE_TEXT=1
+  LIBXR_PRINT_ENABLE_POINTER=1
+  LIBXR_PRINT_ENABLE_FLOAT=1
+  LIBXR_PRINT_INTEGER_ENABLE_BASE8_16=1
+  LIBXR_PRINT_INTEGER_ENABLE_64BIT=1
+  LIBXR_PRINT_FLOAT_ENABLE_FIXED=1
+  LIBXR_PRINT_FLOAT_ENABLE_DOUBLE=1
+  LIBXR_PRINT_FLOAT_ENABLE_SCIENTIFIC=1
+  LIBXR_PRINT_FLOAT_ENABLE_GENERAL=1
+  LIBXR_PRINT_FLOAT_ENABLE_LONG_DOUBLE=0
+  LIBXR_PRINT_ENABLE_WIDTH=1
+  LIBXR_PRINT_ENABLE_PRECISION=1
+  LIBXR_PRINT_ENABLE_ALTERNATE=1
+  LIBXR_PRINT_ENABLE_EXPLICIT_ARGUMENT_INDEXING=1
+)
+
+enable_testing()
+add_test(NAME zdt_motor_tests COMMAND zdt_motor_tests)
