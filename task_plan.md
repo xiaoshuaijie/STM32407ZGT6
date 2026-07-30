@@ -83,6 +83,18 @@ Complete `bujin_motor` TTL protocol driver updates from the ZDT X42S manual and 
 - [x] Verify valid, invalid, checksum-failure, and stream-resynchronization behavior.
 - **Status:** complete
 
+### Phase 12: Improve LCD operator-panel readability
+- [x] Inspect the current display geometry, font metrics, and panel layout.
+- [x] Increase the text size and move the displayed status content rightward without clipping it.
+- [x] Rebuild the firmware and check the resulting source diff.
+- **Status:** complete
+
+### Phase 13: Display stepper motor position telemetry
+- [x] Publish the X42S encoder angle and latest command target through `BalanceStatus`.
+- [x] Read the encoder from the controller task at a bounded rate so the LCD task never accesses USART3.
+- [x] Add a sixth LCD row while preserving the enlarged font and rebuild the Debug firmware.
+- **Status:** complete
+
 ## Decisions Made
 | Decision | Rationale |
 |---|---|

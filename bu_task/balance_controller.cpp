@@ -157,6 +157,8 @@ void BalanceController::StartTask()
     status_.task_phase = status_.selected_task == ContestTask::Task3
                              ? kTask3MovePositive
                              : 0;
+    status_.motor_position_degrees = 0.0F;
+    status_.motor_position_valid = config_.zero_motor_on_task_start;
     status_.target_position_cm =
         status_.selected_task == ContestTask::Task6 ? config_.task6_target_cm : 0.0F;
     if (status_.selected_task == ContestTask::Task3)
@@ -165,6 +167,8 @@ void BalanceController::StartTask()
     }
     task_start_time_ms_ = now_ms;
     target_settle_start_ms_ = 0;
+    last_motor_position_poll_ms_ =
+        now_ms - config_.motor_position_poll_period_ms;
     motion_command_active_ = false;
     last_command_angle_degrees_ = 0.0F;
   }
@@ -306,7 +310,34 @@ void BalanceController::UpdateControl(uint32_t now_ms)
     motion_command_active_ = true;
     status_.motor_error = static_cast<int32_t>(LibXR::ErrorCode::OK);
   }
+  UpdateMotorPosition(now_ms);
   PublishStatus();
+}
+
+void BalanceController::UpdateMotorPosition(uint32_t now_ms)
+{
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    if (static_cast<uint32_t>(now_ms - last_motor_position_poll_ms_) <
+        config_.motor_position_poll_period_ms)
+    {
+      return;
+    }
+    last_motor_position_poll_ms_ = now_ms;
+  }
+
+  float position_degrees = 0.0F;
+  const auto result = config_.motor->ReadRealtimeAngle(position_degrees);
+  LibXR::Mutex::LockGuard lock(mutex_);
+  if (result == LibXR::ErrorCode::OK)
+  {
+    status_.motor_position_degrees = position_degrees;
+    status_.motor_position_valid = true;
+  }
+  else
+  {
+    status_.motor_position_valid = false;
+  }
 }
 
 void BalanceController::UpdateTaskTarget(uint32_t now_ms)
@@ -388,7 +419,7 @@ bool BalanceController::IsConfigurationValid() const
          std::isfinite(config_.max_abs_position_cm) &&
          config_.max_abs_position_cm > 0.0F && config_.motor_speed_rpm > 0 &&
          config_.control_period_ms > 0 && config_.vision_timeout_ms > 0 &&
-         config_.settle_time_ms > 0;
+         config_.settle_time_ms > 0 && config_.motor_position_poll_period_ms > 0;
 }
 
 ContestTask BalanceController::NextTask(ContestTask task)

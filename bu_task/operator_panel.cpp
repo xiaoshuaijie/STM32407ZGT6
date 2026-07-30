@@ -8,6 +8,8 @@ namespace
 {
 
 constexpr uint8_t kDebounceSamples = 3;
+constexpr uint16_t kContentX = 80;
+constexpr uint16_t kLineY[] = {0, 29, 58, 87, 116, 145};
 
 }  // namespace
 
@@ -42,7 +44,7 @@ void OperatorPanel::Run()
     return;
   }
 
-  lcd_set_font(config_.display, FONT_DEFAULT, WHITE, BLACK);
+  lcd_set_font(config_.display, FONT_2412, WHITE, BLACK);
   lcd_clear(config_.display, BLACK);
   uint32_t last_display_time_ms =
       LibXR::Thread::GetTime() - config_.display_period_ms;
@@ -77,15 +79,20 @@ void OperatorPanel::Render(const BalanceStatus& status)
                               ? 9999U
                               : static_cast<unsigned>(status.vision_age_ms);
   const char vision = status.vision_valid ? 'Y' : 'N';
+  const char motor_position = status.motor_position_valid ? 'Y' : 'N';
 
-  lcd_print(config_.display, 0, 0, "T%u %-9s", task_number,
+  lcd_print(config_.display, kContentX, kLineY[0], "T%u %-9s", task_number,
             StateName(status.run_state));
-  lcd_print(config_.display, 0, 14, "TIME %2u.%us", seconds, tenth_seconds);
-  lcd_print(config_.display, 0, 28, "X%+5.2f R%+5.2f", status.position_cm,
+  lcd_print(config_.display, kContentX, kLineY[1], "TIME %2u.%us", seconds,
+            tenth_seconds);
+  lcd_print(config_.display, kContentX, kLineY[2], "X%+5.2f R%+5.2f", status.position_cm,
             status.target_position_cm);
-  lcd_print(config_.display, 0, 42, "V%c C%.2f A%04u", vision, status.confidence,
+  lcd_print(config_.display, kContentX, kLineY[3], "V%c C%.2f A%04u", vision, status.confidence,
             age_ms);
-  lcd_print(config_.display, 0, 56, "F:%-10s", FaultName(status.fault));
+  lcd_print(config_.display, kContentX, kLineY[4], "F:%-10s", FaultName(status.fault));
+  lcd_print(config_.display, kContentX, kLineY[5], "M%c%+6.1f G%+6.1f",
+            motor_position, status.motor_position_degrees,
+            status.target_angle_degrees);
 }
 
 const char* OperatorPanel::StateName(BalanceRunState state)

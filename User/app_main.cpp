@@ -78,8 +78,8 @@ extern "C" void app_main(void) {
   STM32GPIO LCD_PWR(LCD_PWR_GPIO_Port, LCD_PWR_Pin);
   STM32GPIO LCD_RST(LCD_RST_GPIO_Port, LCD_RST_Pin);
   STM32GPIO LCD_CS(LCD_CS_GPIO_Port, LCD_CS_Pin);
-  PA4.SetConfig({GPIO::Direction::INPUT, GPIO::Pull::DOWN});
-  PA5.SetConfig({GPIO::Direction::INPUT, GPIO::Pull::DOWN});
+  PA4.SetConfig({GPIO::Direction::INPUT, GPIO::Pull::UP});
+  PA5.SetConfig({GPIO::Direction::INPUT, GPIO::Pull::UP});
 
 
   STM32SPI spi1(&hspi1, spi1_rx_buf, spi1_tx_buf, 3);
@@ -168,9 +168,9 @@ extern "C" void app_main(void) {
   BuTask::OperatorPanel operator_panel(panel_config);
 
   LibXR::Thread balance_control_thread;
-  balance_control_thread.Create(&balance_controller, BuTask::BalanceControlThread,
-                                "balance_ctrl", 1536,
-                                LibXR::Thread::Priority::MEDIUM);
+  balance_control_thread.Create(&balance_controller,
+                                BuTask::BalanceControlThread, "balance_ctrl",
+                                1536, LibXR::Thread::Priority::MEDIUM);
   LibXR::Thread operator_panel_thread;
   operator_panel_thread.Create(&operator_panel, BuTask::OperatorPanelThread,
                                "balance_ui", 1024,

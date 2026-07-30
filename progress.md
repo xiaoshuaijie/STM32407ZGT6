@@ -1,5 +1,17 @@
 # Progress Log
 
+### LCD readability adjustment: 2026-07-30
+- **Status:** complete
+- Began inspection after a hardware photo showed the status panel is left-aligned, small, and clips a long line on the 1.47-inch LCD.
+- Updated the operator panel to use the 12x24 font and fixed five-line positions starting at x=80; the layout occupies y=10 through y=162 on the 320x172 LCD.
+- `cmake --build --preset Debug` completed successfully; `git diff --check` reported no whitespace errors.
+
+### Stepper motor position display: 2026-07-30
+- **Status:** complete
+- Located the X42S realtime encoder query. The controller will poll it at a bounded low rate and publish the result to the LCD through `BalanceStatus`, retaining serial ownership in the control task.
+- Added the encoder validity/value fields, a 500 ms serialized controller poll, and a sixth enlarged LCD row for actual and target motor angle.
+- `cmake --build --preset Debug` completed successfully (RAM 38.68%, flash 11.84%); the six-row 12x24 layout remains inside the LCD bounds.
+
 ## Session: 2026-07-30
 
 ### Current task intake: balance-ball firmware

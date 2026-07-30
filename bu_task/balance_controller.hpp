@@ -41,6 +41,7 @@ struct BalanceStatus
   BalanceRunState run_state = BalanceRunState::Ready;
   BalanceFault fault = BalanceFault::None;
   bool motor_enabled = false;
+  bool motor_position_valid = false;
   bool vision_valid = false;
   uint8_t task_phase = 0;
   uint32_t elapsed_ms = 0;
@@ -51,6 +52,7 @@ struct BalanceStatus
   float confidence = 0.0F;
   float target_position_cm = 0.0F;
   float target_angle_degrees = 0.0F;
+  float motor_position_degrees = 0.0F;
   int32_t motor_error = 0;
 };
 
@@ -75,6 +77,7 @@ struct BalanceControllerConfig
   uint32_t control_period_ms = 20;
   uint32_t vision_timeout_ms = 200;
   uint32_t settle_time_ms = 300;
+  uint32_t motor_position_poll_period_ms = 500;
   bool zero_motor_on_task_start = true;
 };
 
@@ -96,6 +99,7 @@ class BalanceController
   void AbortTask(BalanceFault fault);
   void CompleteTask();
   void UpdateControl(uint32_t now_ms);
+  void UpdateMotorPosition(uint32_t now_ms);
   void UpdateTaskTarget(uint32_t now_ms);
   void SetFault(BalanceFault fault, LibXR::ErrorCode motor_error);
   void PublishStatus();
@@ -114,6 +118,7 @@ class BalanceController
   bool motion_command_active_ = false;
   uint32_t task_start_time_ms_ = 0;
   uint32_t target_settle_start_ms_ = 0;
+  uint32_t last_motor_position_poll_ms_ = 0;
   float last_command_angle_degrees_ = 0.0F;
 };
 

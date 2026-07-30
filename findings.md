@@ -1,6 +1,12 @@
 # Findings
 
 ## Current Task
+- Improve the LCD operator-panel layout: the photographed 1.47-inch display shows small status text crowded against the left edge and a long row being clipped. The requested outcome is larger text moved toward the right side while retaining all status information.
+- The panel's `FONT_2412` geometry is 12x24 pixels. With x=80, the longest current 15-character status row occupies 180 pixels and ends at x=260; five rows at y=10, 42, 74, 106, and 138 end at y=162, within the 320x172 display.
+- The Debug firmware rebuild succeeded after the panel update: RAM 50,696 B / 128 KB (38.68%), flash 123,620 B / 1 MB (11.79%).
+- `ZdtX42s::ReadRealtimeAngle` is the X42S TTL encoder query. It is synchronous and must remain in the controller task, which is already the sole owner of USART3; the LCD task must only render the copied `BalanceStatus` data.
+- The controller queries the encoder every 500 ms while running. The LCD row is `M<Y/N><actual> G<target>` in degrees; six 12x24 rows at y=0, 29, 58, 87, 116, and 145 end at y=169 within the 320x172 display.
+- The Debug firmware rebuilt with telemetry enabled: RAM 50,696 B / 128 KB (38.68%), flash 124,156 B / 1 MB (11.84%).
 - Build the STM32-side application for the H-problem vehicle balance-ball system.
 - Vision sends `valid`, `x_cm`, `vx_pixel_s`, `confidence`, and `frame_time_ms` to this MCU.
 - Required integrations include X42S stepper control, the existing CAN and LCD modules where useful, PA4/PA5 task controls, LibXR topics, and an on-demand command-line print path modeled after the BMI088 module.
