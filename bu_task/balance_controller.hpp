@@ -11,6 +11,7 @@ namespace BuTask
 
 enum class ContestTask : uint8_t
 {
+  Monitor = 0,
   Task3 = 3,
   Task4 = 4,
   Task5 = 5,
@@ -37,7 +38,7 @@ enum class BalanceFault : uint8_t
 
 struct BalanceStatus
 {
-  ContestTask selected_task = ContestTask::Task3;
+  ContestTask selected_task = ContestTask::Monitor;
   BalanceRunState run_state = BalanceRunState::Ready;
   BalanceFault fault = BalanceFault::None;
   bool motor_enabled = false;
@@ -99,6 +100,7 @@ class BalanceController
   void AbortTask(BalanceFault fault);
   void CompleteTask();
   void UpdateControl(uint32_t now_ms);
+  void UpdateMonitorStatus(uint32_t now_ms);
   void UpdateMotorPosition(uint32_t now_ms);
   void UpdateTaskTarget(uint32_t now_ms);
   void SetFault(BalanceFault fault, LibXR::ErrorCode motor_error);

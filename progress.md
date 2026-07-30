@@ -12,6 +12,13 @@
 - Added the encoder validity/value fields, a 500 ms serialized controller poll, and a sixth enlarged LCD row for actual and target motor angle.
 - `cmake --build --preset Debug` completed successfully (RAM 38.68%, flash 11.84%); the six-row 12x24 layout remains inside the LCD bounds.
 
+### Default LCD viewing mode: 2026-07-30
+- **Status:** complete
+- The requested initial task will be a monitor mode. It must refresh status fields only and cannot reuse the existing motor-enable/task-start path.
+- Added `VIEW` as task zero and the default selected task. Its control-thread refresh path reads the mailbox/encoder status, while PA5 ignores start requests in this mode.
+- Debug build passed: RAM 38.68%, flash 11.88%. The PA4 cycle is `VIEW -> T3 -> T4 -> T5 -> T6 -> VIEW`.
+- A final combined regular-expression check failed due to Windows-path escaping; this did not modify source or affect the successful build. The verification is being repeated with fixed-string searches.
+
 ## Session: 2026-07-30
 
 ### Current task intake: balance-ball firmware

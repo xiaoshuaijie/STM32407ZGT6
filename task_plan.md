@@ -95,6 +95,12 @@ Complete `bujin_motor` TTL protocol driver updates from the ZDT X42S manual and 
 - [x] Add a sixth LCD row while preserving the enlarged font and rebuild the Debug firmware.
 - **Status:** complete
 
+### Phase 14: Add a default LCD viewing mode
+- [x] Add a no-control monitor task before T3 through T6 and select it at boot.
+- [x] Refresh vision and motor telemetry in monitor mode without issuing motor control commands.
+- [x] Update LCD task naming/cycling and rebuild the Debug firmware.
+- **Status:** complete
+
 ## Decisions Made
 | Decision | Rationale |
 |---|---|
@@ -113,3 +119,4 @@ Complete `bujin_motor` TTL protocol driver updates from the ZDT X42S manual and 
 | Baseline build fails because expanded `zdt_x42s.hpp` does not match legacy `zdt_x42s.cpp` | 1 | Complete the protocol implementation/compatibility surface before integrating the controller. |
 | PDF discovery selected an unrelated `H*.pdf` in Downloads | 2 | Select the known contest PDF by the recorded 493,976-byte size rather than a one-character prefix. |
 | First combined follow-up patch did not match the current source context | 1 | Re-read the affected source blocks and applied the deadlock/emergency-stop fixes with exact context. |
+| Final monitor-mode check used a combined `rg` expression with Windows path escaping | 1 | Re-run the check with fixed-string searches rather than one escaped regular expression. |

@@ -72,7 +72,6 @@ void OperatorPanel::Run()
 
 void OperatorPanel::Render(const BalanceStatus& status)
 {
-  const unsigned task_number = static_cast<unsigned>(status.selected_task);
   const unsigned seconds = static_cast<unsigned>(status.elapsed_ms / 1000U);
   const unsigned tenth_seconds = static_cast<unsigned>((status.elapsed_ms % 1000U) / 100U);
   const unsigned age_ms = status.vision_age_ms == UINT32_MAX
@@ -81,8 +80,8 @@ void OperatorPanel::Render(const BalanceStatus& status)
   const char vision = status.vision_valid ? 'Y' : 'N';
   const char motor_position = status.motor_position_valid ? 'Y' : 'N';
 
-  lcd_print(config_.display, kContentX, kLineY[0], "T%u %-9s", task_number,
-            StateName(status.run_state));
+  lcd_print(config_.display, kContentX, kLineY[0], "%-7s %-9s",
+            TaskName(status.selected_task), StateName(status.run_state));
   lcd_print(config_.display, kContentX, kLineY[1], "TIME %2u.%us", seconds,
             tenth_seconds);
   lcd_print(config_.display, kContentX, kLineY[2], "X%+5.2f R%+5.2f", status.position_cm,
@@ -93,6 +92,24 @@ void OperatorPanel::Render(const BalanceStatus& status)
   lcd_print(config_.display, kContentX, kLineY[5], "M%c%+6.1f G%+6.1f",
             motor_position, status.motor_position_degrees,
             status.target_angle_degrees);
+}
+
+const char* OperatorPanel::TaskName(ContestTask task)
+{
+  switch (task)
+  {
+    case ContestTask::Monitor:
+      return "VIEW";
+    case ContestTask::Task3:
+      return "T3";
+    case ContestTask::Task4:
+      return "T4";
+    case ContestTask::Task5:
+      return "T5";
+    case ContestTask::Task6:
+    default:
+      return "T6";
+  }
 }
 
 const char* OperatorPanel::StateName(BalanceRunState state)

@@ -7,6 +7,9 @@
 - `ZdtX42s::ReadRealtimeAngle` is the X42S TTL encoder query. It is synchronous and must remain in the controller task, which is already the sole owner of USART3; the LCD task must only render the copied `BalanceStatus` data.
 - The controller queries the encoder every 500 ms while running. The LCD row is `M<Y/N><actual> G<target>` in degrees; six 12x24 rows at y=0, 29, 58, 87, 116, and 145 end at y=169 within the 320x172 display.
 - The Debug firmware rebuilt with telemetry enabled: RAM 50,696 B / 128 KB (38.68%), flash 124,156 B / 1 MB (11.84%).
+- The existing non-running path only sleeps, so LCD values do not update before a task starts. The new default monitor mode must refresh the measurement/encoder fields without passing through `StartTask`, which would enable, zero, or move the motor.
+- `ContestTask::Monitor` is now the default selection and renders as `VIEW READY`. The PA4 sequence is `VIEW -> T3 -> T4 -> T5 -> T6 -> VIEW`; PA5 is ignored in `VIEW`. Its refresh path reads only the vision mailbox and X42S encoder status, without enable, zero, move, or stop commands.
+- The Debug firmware rebuild succeeded: RAM 50,696 B / 128 KB (38.68%), flash 124,588 B / 1 MB (11.88%).
 - Build the STM32-side application for the H-problem vehicle balance-ball system.
 - Vision sends `valid`, `x_cm`, `vx_pixel_s`, `confidence`, and `frame_time_ms` to this MCU.
 - Required integrations include X42S stepper control, the existing CAN and LCD modules where useful, PA4/PA5 task controls, LibXR topics, and an on-demand command-line print path modeled after the BMI088 module.

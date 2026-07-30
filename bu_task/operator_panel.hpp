@@ -39,6 +39,7 @@ class OperatorPanel
   };
 
   void Render(const BalanceStatus& status);
+  [[nodiscard]] static const char* TaskName(ContestTask task);
   [[nodiscard]] static const char* StateName(BalanceRunState state);
   [[nodiscard]] static const char* FaultName(BalanceFault fault);
 

@@ -54,7 +54,7 @@ void BalanceController::ToggleRun()
     {
       abort_requested_ = true;
     }
-    else
+    else if (status_.selected_task != ContestTask::Monitor)
     {
       start_requested_ = true;
     }
@@ -81,7 +81,8 @@ void BalanceController::Run()
     const uint32_t cycle_start_ms = LibXR::Thread::GetTime();
     HandleRequests();
 
-    if (GetStatus().run_state == BalanceRunState::Running)
+    const BalanceStatus status = GetStatus();
+    if (status.run_state == BalanceRunState::Running)
     {
       Maxican::BallMeasurement measurement;
       if (config_.mailbox->WaitForUpdate(measurement, config_.control_period_ms))
@@ -91,6 +92,10 @@ void BalanceController::Run()
         has_measurement_ = true;
       }
       UpdateControl(LibXR::Thread::GetTime());
+    }
+    else if (status.selected_task == ContestTask::Monitor)
+    {
+      UpdateMonitorStatus(LibXR::Thread::GetTime());
     }
     else
     {
@@ -130,6 +135,14 @@ void BalanceController::HandleRequests()
 
 void BalanceController::StartTask()
 {
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    if (status_.selected_task == ContestTask::Monitor)
+    {
+      return;
+    }
+  }
+
   const auto enable_result = config_.motor->Enable(true);
   if (enable_result != LibXR::ErrorCode::OK)
   {
@@ -340,6 +353,41 @@ void BalanceController::UpdateMotorPosition(uint32_t now_ms)
   }
 }
 
+void BalanceController::UpdateMonitorStatus(uint32_t now_ms)
+{
+  Maxican::BallMeasurement measurement;
+  if (config_.mailbox->WaitForUpdate(measurement, config_.control_period_ms))
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    latest_measurement_ = measurement;
+    has_measurement_ = true;
+  }
+
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    const Maxican::BallMeasurement latest = latest_measurement_;
+    status_.elapsed_ms = 0;
+    status_.target_position_cm = 0.0F;
+    status_.target_angle_degrees = 0.0F;
+    status_.vision_age_ms = has_measurement_
+                                ? static_cast<uint32_t>(now_ms - latest.received_time_ms)
+                                : UINT32_MAX;
+    status_.position_cm = latest.position_cm;
+    status_.velocity_pixel_s = latest.velocity_pixel_s;
+    status_.confidence = latest.confidence;
+    status_.source_frame_time_ms = latest.frame_time_ms;
+    status_.vision_valid = has_measurement_ &&
+                           IsFreshMeasurement(latest, now_ms,
+                                              config_.vision_timeout_ms) &&
+                           latest.confidence >= config_.min_confidence &&
+                           std::fabs(latest.position_cm) <=
+                               config_.max_abs_position_cm;
+  }
+
+  UpdateMotorPosition(now_ms);
+  PublishStatus();
+}
+
 void BalanceController::UpdateTaskTarget(uint32_t now_ms)
 {
   BalanceStatus snapshot = GetStatus();
@@ -426,6 +474,8 @@ ContestTask BalanceController::NextTask(ContestTask task)
 {
   switch (task)
   {
+    case ContestTask::Monitor:
+      return ContestTask::Task3;
     case ContestTask::Task3:
       return ContestTask::Task4;
     case ContestTask::Task4:
@@ -434,7 +484,7 @@ ContestTask BalanceController::NextTask(ContestTask task)
       return ContestTask::Task6;
     case ContestTask::Task6:
     default:
-      return ContestTask::Task3;
+      return ContestTask::Monitor;
   }
 }
 
@@ -442,6 +492,8 @@ uint32_t BalanceController::TimeLimitMs(ContestTask task)
 {
   switch (task)
   {
+    case ContestTask::Monitor:
+      return 0;
     case ContestTask::Task3:
       return kTask3TimeLimitMs;
     case ContestTask::Task4:
