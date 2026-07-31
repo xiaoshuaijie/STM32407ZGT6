@@ -13,6 +13,22 @@ constexpr uint32_t kTask4TimeLimitMs = 8000;
 constexpr uint32_t kLapTimeLimitMs = 30000;
 constexpr uint8_t kTask3MovePositive = 1;
 constexpr uint8_t kTask3MoveNegative = 2;
+constexpr uint8_t kViewTestMovePositive = 3;
+constexpr uint8_t kViewTestMoveNegative = 4;
+constexpr float kViewTestPositiveDegrees = 10.0F;
+constexpr float kViewTestNegativeDegrees = -10.0F;
+constexpr float kViewTestPositionToleranceDegrees = 0.5F;
+constexpr uint16_t kViewTestSpeedRpm = 30;
+constexpr uint8_t kViewTestAcceleration = 20;
+constexpr uint32_t kViewTestPhaseTimeoutMs = 3000;
+constexpr uint32_t kViewTestPositionPollPeriodMs = 50;
+constexpr float kMotorDebugMaxAbsTargetDegrees = 10.0F;
+constexpr float kMotorDebugPositionToleranceDegrees = 0.5F;
+constexpr uint16_t kMotorDebugMaxSpeedRpm = 60;
+constexpr uint8_t kMotorDebugMaxAcceleration = 50;
+constexpr uint32_t kMotorDebugPollPeriodMs = 50;
+constexpr uint32_t kMotorDebugMotionTimeoutMs = 3000;
+constexpr uint8_t kMotorDebugRequiredSettledSamples = 3;
 
 bool IsFreshMeasurement(const Maxican::BallMeasurement& measurement,
                         uint32_t now_ms, uint32_t timeout_ms)
@@ -21,7 +37,26 @@ bool IsFreshMeasurement(const Maxican::BallMeasurement& measurement,
          static_cast<uint32_t>(now_ms - measurement.received_time_ms) <= timeout_ms;
 }
 
+float ShortestAngleError(float measured_degrees, float target_degrees)
+{
+  float error = std::fmod(measured_degrees - target_degrees, 360.0F);
+  if (error > 180.0F)
+  {
+    error -= 360.0F;
+  }
+  else if (error < -180.0F)
+  {
+    error += 360.0F;
+  }
+  return error;
+}
+
 }  // namespace
+
+extern "C"
+{
+volatile MotorDebugMailbox g_motor_debug_mailbox{};
+}
 
 BalanceController::BalanceController(BalanceControllerConfig config)
     : config_(config),
@@ -34,6 +69,14 @@ void BalanceController::SelectNextTask()
   {
     LibXR::Mutex::LockGuard lock(mutex_);
     if (status_.run_state == BalanceRunState::Running)
+    {
+      if (status_.selected_task == ContestTask::Monitor)
+      {
+        view_test_reverse_requested_ = true;
+      }
+      return;
+    }
+    if (g_motor_debug_mailbox.motion_active != 0)
     {
       return;
     }
@@ -54,7 +97,7 @@ void BalanceController::ToggleRun()
     {
       abort_requested_ = true;
     }
-    else if (status_.selected_task != ContestTask::Monitor)
+    else
     {
       start_requested_ = true;
     }
@@ -84,18 +127,27 @@ void BalanceController::Run()
     const BalanceStatus status = GetStatus();
     if (status.run_state == BalanceRunState::Running)
     {
-      Maxican::BallMeasurement measurement;
-      if (config_.mailbox->WaitForUpdate(measurement, config_.control_period_ms))
+      if (status.selected_task == ContestTask::Monitor)
       {
-        LibXR::Mutex::LockGuard lock(mutex_);
-        latest_measurement_ = measurement;
-        has_measurement_ = true;
+        UpdateViewMotorTest(LibXR::Thread::GetTime());
       }
-      UpdateControl(LibXR::Thread::GetTime());
+      else
+      {
+        Maxican::BallMeasurement measurement;
+        if (config_.mailbox->WaitForUpdate(measurement, config_.control_period_ms))
+        {
+          LibXR::Mutex::LockGuard lock(mutex_);
+          latest_measurement_ = measurement;
+          has_measurement_ = true;
+        }
+        UpdateControl(LibXR::Thread::GetTime());
+      }
     }
     else if (status.selected_task == ContestTask::Monitor)
     {
-      UpdateMonitorStatus(LibXR::Thread::GetTime());
+      const uint32_t now_ms = LibXR::Thread::GetTime();
+      HandleMotorDebugMailbox(now_ms);
+      UpdateMonitorStatus(now_ms);
     }
     else
     {
@@ -135,12 +187,15 @@ void BalanceController::HandleRequests()
 
 void BalanceController::StartTask()
 {
+  bool start_view_test = false;
   {
     LibXR::Mutex::LockGuard lock(mutex_);
-    if (status_.selected_task == ContestTask::Monitor)
-    {
-      return;
-    }
+    start_view_test = status_.selected_task == ContestTask::Monitor;
+  }
+  if (start_view_test)
+  {
+    StartViewMotorTest();
+    return;
   }
 
   const auto enable_result = config_.motor->Enable(true);
@@ -184,6 +239,51 @@ void BalanceController::StartTask()
         now_ms - config_.motor_position_poll_period_ms;
     motion_command_active_ = false;
     last_command_angle_degrees_ = 0.0F;
+  }
+  PublishStatus();
+}
+
+void BalanceController::StartViewMotorTest()
+{
+  const auto enable_result = config_.motor->Enable(true);
+  if (enable_result != LibXR::ErrorCode::OK)
+  {
+    SetFault(BalanceFault::MotorCommand, enable_result);
+    return;
+  }
+
+  const auto zero_result = config_.motor->SetCurrentPositionAsZero();
+  if (zero_result != LibXR::ErrorCode::OK)
+  {
+    AbortTask(BalanceFault::MotorCommand);
+    return;
+  }
+
+  const auto move_result = config_.motor->MoveToAbsoluteAngle(
+      kViewTestPositiveDegrees, kViewTestSpeedRpm, kViewTestAcceleration);
+  if (move_result != LibXR::ErrorCode::OK)
+  {
+    AbortTask(BalanceFault::MotorCommand);
+    return;
+  }
+
+  const uint32_t now_ms = LibXR::Thread::GetTime();
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    status_.run_state = BalanceRunState::Running;
+    status_.fault = BalanceFault::None;
+    status_.motor_enabled = true;
+    status_.motor_position_valid = true;
+    status_.motor_error = static_cast<int32_t>(LibXR::ErrorCode::OK);
+    status_.elapsed_ms = 0;
+    status_.task_phase = kViewTestMovePositive;
+    status_.target_position_cm = 0.0F;
+    status_.target_angle_degrees = kViewTestPositiveDegrees;
+    status_.motor_position_degrees = 0.0F;
+    task_start_time_ms_ = now_ms;
+    view_test_phase_start_ms_ = now_ms;
+    view_test_last_position_poll_ms_ = now_ms - kViewTestPositionPollPeriodMs;
+    view_test_reverse_requested_ = false;
   }
   PublishStatus();
 }
@@ -327,6 +427,121 @@ void BalanceController::UpdateControl(uint32_t now_ms)
   PublishStatus();
 }
 
+void BalanceController::UpdateViewMotorTest(uint32_t now_ms)
+{
+  const BalanceStatus snapshot = GetStatus();
+  if (snapshot.run_state != BalanceRunState::Running ||
+      snapshot.selected_task != ContestTask::Monitor)
+  {
+    return;
+  }
+
+  const float target_degrees = snapshot.task_phase == kViewTestMovePositive
+                                   ? kViewTestPositiveDegrees
+                                   : kViewTestNegativeDegrees;
+  if (snapshot.task_phase != kViewTestMovePositive &&
+      snapshot.task_phase != kViewTestMoveNegative)
+  {
+    AbortTask(BalanceFault::Configuration);
+    return;
+  }
+
+  bool reverse_requested = false;
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    reverse_requested = view_test_reverse_requested_;
+    view_test_reverse_requested_ = false;
+  }
+  if (reverse_requested && snapshot.task_phase != kViewTestMoveNegative)
+  {
+    const auto move_result = config_.motor->MoveToAbsoluteAngle(
+        kViewTestNegativeDegrees, kViewTestSpeedRpm, kViewTestAcceleration);
+    if (move_result != LibXR::ErrorCode::OK)
+    {
+      AbortTask(BalanceFault::MotorCommand);
+      return;
+    }
+
+    {
+      LibXR::Mutex::LockGuard lock(mutex_);
+      status_.task_phase = kViewTestMoveNegative;
+      status_.target_angle_degrees = kViewTestNegativeDegrees;
+      status_.motor_error = static_cast<int32_t>(move_result);
+      view_test_phase_start_ms_ = now_ms;
+    }
+    PublishStatus();
+    return;
+  }
+
+  bool phase_timeout = false;
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    status_.elapsed_ms = static_cast<uint32_t>(now_ms - task_start_time_ms_);
+    phase_timeout = static_cast<uint32_t>(now_ms - view_test_phase_start_ms_) >=
+                    kViewTestPhaseTimeoutMs;
+    if (!phase_timeout &&
+        static_cast<uint32_t>(now_ms - view_test_last_position_poll_ms_) >=
+            kViewTestPositionPollPeriodMs)
+    {
+      view_test_last_position_poll_ms_ = now_ms;
+    }
+    else if (!phase_timeout)
+    {
+      return;
+    }
+  }
+  if (phase_timeout)
+  {
+    AbortTask(BalanceFault::TaskTimeout);
+    return;
+  }
+
+  float position_degrees = 0.0F;
+  const auto read_result = config_.motor->ReadRealtimeAngle(position_degrees);
+  if (read_result != LibXR::ErrorCode::OK)
+  {
+    AbortTask(BalanceFault::MotorCommand);
+    return;
+  }
+
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    status_.motor_position_degrees = position_degrees;
+    status_.motor_position_valid = true;
+    status_.motor_error = static_cast<int32_t>(read_result);
+  }
+
+  if (std::fabs(ShortestAngleError(position_degrees, target_degrees)) <=
+      kViewTestPositionToleranceDegrees)
+  {
+    if (snapshot.task_phase == kViewTestMoveNegative)
+    {
+      CompleteTask();
+      return;
+    }
+
+    const auto move_result = config_.motor->MoveToAbsoluteAngle(
+        kViewTestNegativeDegrees, kViewTestSpeedRpm, kViewTestAcceleration);
+    if (move_result != LibXR::ErrorCode::OK)
+    {
+      AbortTask(BalanceFault::MotorCommand);
+      return;
+    }
+
+    {
+      LibXR::Mutex::LockGuard lock(mutex_);
+      status_.task_phase = kViewTestMoveNegative;
+      status_.target_angle_degrees = kViewTestNegativeDegrees;
+      status_.motor_error = static_cast<int32_t>(move_result);
+      view_test_phase_start_ms_ = now_ms;
+    }
+    PublishStatus();
+    return;
+  }
+
+  PublishStatus();
+}
+
 void BalanceController::UpdateMotorPosition(uint32_t now_ms)
 {
   {
@@ -350,6 +565,239 @@ void BalanceController::UpdateMotorPosition(uint32_t now_ms)
   else
   {
     status_.motor_position_valid = false;
+  }
+}
+
+void BalanceController::FinishMotorDebugRequest(uint32_t sequence,
+                                                LibXR::ErrorCode result)
+{
+  g_motor_debug_mailbox.result = static_cast<int32_t>(result);
+  g_motor_debug_mailbox.completed_sequence = sequence;
+  g_motor_debug_mailbox.last_update_ms = LibXR::Thread::GetTime();
+}
+
+void BalanceController::HandleMotorDebugMailbox(uint32_t now_ms)
+{
+  const uint32_t request_sequence = g_motor_debug_mailbox.request_sequence;
+  if (request_sequence != motor_debug_seen_sequence_)
+  {
+    motor_debug_seen_sequence_ = request_sequence;
+    const uint32_t unlock_key = g_motor_debug_mailbox.unlock_key;
+    const auto operation =
+        static_cast<MotorDebugOperation>(g_motor_debug_mailbox.operation);
+    const float target_degrees = g_motor_debug_mailbox.target_degrees;
+    const uint32_t speed_rpm = g_motor_debug_mailbox.speed_rpm;
+    const uint32_t acceleration = g_motor_debug_mailbox.acceleration;
+    g_motor_debug_mailbox.unlock_key = 0;
+    g_motor_debug_mailbox.result = kMotorDebugPendingResult;
+    g_motor_debug_mailbox.last_update_ms = now_ms;
+
+    const BalanceStatus status = GetStatus();
+    if (request_sequence == 0 || unlock_key != kMotorDebugUnlockKey)
+    {
+      FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::ARG_ERR);
+    }
+    else if (status.selected_task != ContestTask::Monitor ||
+             status.run_state == BalanceRunState::Running)
+    {
+      FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::STATE_ERR);
+    }
+    else if (motor_debug_motion_active_ && operation != MotorDebugOperation::Stop &&
+             operation != MotorDebugOperation::Disable)
+    {
+      FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::STATE_ERR);
+    }
+    else if (operation == MotorDebugOperation::ReadPosition)
+    {
+      float position_degrees = 0.0F;
+      const auto result = config_.motor->ReadRealtimeAngle(position_degrees);
+      g_motor_debug_mailbox.position_valid = result == LibXR::ErrorCode::OK;
+      if (result == LibXR::ErrorCode::OK)
+      {
+        g_motor_debug_mailbox.position_degrees = position_degrees;
+        g_motor_debug_mailbox.position_error_degrees = 0.0F;
+        LibXR::Mutex::LockGuard lock(mutex_);
+        status_.motor_position_degrees = position_degrees;
+        status_.motor_position_valid = true;
+        status_.motor_error = static_cast<int32_t>(result);
+      }
+      FinishMotorDebugRequest(request_sequence, result);
+    }
+    else if (operation == MotorDebugOperation::ReadMotorConfig)
+    {
+      BujinMotor::ZdtX42s::MotorConfigReadback readback;
+      g_motor_debug_mailbox.config_valid = 0;
+      const auto result = config_.motor->ReadMotorConfig(readback);
+      g_motor_debug_mailbox.config_firmware_type = readback.firmware_type;
+      g_motor_debug_mailbox.config_total_bytes = readback.total_bytes;
+      g_motor_debug_mailbox.config_parameter_count = readback.parameter_count;
+      if (result == LibXR::ErrorCode::OK)
+      {
+        g_motor_debug_mailbox.config_motor_type = readback.motor_type;
+        g_motor_debug_mailbox.config_microstep = readback.microstep;
+        g_motor_debug_mailbox.config_pulses_per_revolution =
+            readback.pulses_per_revolution;
+        g_motor_debug_mailbox.config_address = readback.address;
+        g_motor_debug_mailbox.config_serial_baud_rate =
+            readback.serial_baud_rate;
+        g_motor_debug_mailbox.config_checksum_mode = readback.checksum_mode;
+        g_motor_debug_mailbox.config_response_mode = readback.response_mode;
+        g_motor_debug_mailbox.config_position_window_tenths_degree =
+            readback.position_window_tenths_degree;
+        g_motor_debug_mailbox.config_valid = 1;
+      }
+      FinishMotorDebugRequest(request_sequence, result);
+    }
+    else if (operation == MotorDebugOperation::SetCurrentPositionZero)
+    {
+      auto result = config_.motor->Enable(true);
+      if (result == LibXR::ErrorCode::OK)
+      {
+        result = config_.motor->SetCurrentPositionAsZero();
+      }
+      if (result == LibXR::ErrorCode::OK)
+      {
+        motor_debug_zeroed_ = true;
+        g_motor_debug_mailbox.zeroed = 1;
+        g_motor_debug_mailbox.position_valid = 1;
+        g_motor_debug_mailbox.position_degrees = 0.0F;
+        g_motor_debug_mailbox.position_error_degrees = 0.0F;
+        LibXR::Mutex::LockGuard lock(mutex_);
+        status_.motor_enabled = true;
+        status_.motor_position_valid = true;
+        status_.motor_position_degrees = 0.0F;
+        status_.motor_error = static_cast<int32_t>(result);
+      }
+      FinishMotorDebugRequest(request_sequence, result);
+    }
+    else if (operation == MotorDebugOperation::MoveAbsolute)
+    {
+      if (!motor_debug_zeroed_)
+      {
+        FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::STATE_ERR);
+      }
+      else if (!std::isfinite(target_degrees) ||
+               std::fabs(target_degrees) > kMotorDebugMaxAbsTargetDegrees ||
+               speed_rpm == 0 || speed_rpm > kMotorDebugMaxSpeedRpm ||
+               acceleration == 0 || acceleration > kMotorDebugMaxAcceleration)
+      {
+        FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::OUT_OF_RANGE);
+      }
+      else
+      {
+        auto result = config_.motor->Enable(true);
+        if (result == LibXR::ErrorCode::OK)
+        {
+          result = config_.motor->MoveToAbsoluteAngle(
+              target_degrees, static_cast<uint16_t>(speed_rpm),
+              static_cast<uint8_t>(acceleration));
+        }
+        if (result == LibXR::ErrorCode::OK)
+        {
+          motor_debug_active_sequence_ = request_sequence;
+          motor_debug_motion_start_ms_ = now_ms;
+          motor_debug_last_poll_ms_ = now_ms - kMotorDebugPollPeriodMs;
+          motor_debug_active_target_degrees_ = target_degrees;
+          motor_debug_settled_samples_ = 0;
+          motor_debug_motion_active_ = true;
+          g_motor_debug_mailbox.motion_active = 1;
+          g_motor_debug_mailbox.sample_count = 0;
+          g_motor_debug_mailbox.position_valid = 0;
+          g_motor_debug_mailbox.position_error_degrees = 0.0F;
+          LibXR::Mutex::LockGuard lock(mutex_);
+          status_.motor_enabled = true;
+          status_.target_angle_degrees = target_degrees;
+          status_.motor_error = static_cast<int32_t>(result);
+        }
+        else
+        {
+          FinishMotorDebugRequest(request_sequence, result);
+        }
+      }
+    }
+    else if (operation == MotorDebugOperation::Stop ||
+             operation == MotorDebugOperation::Disable)
+    {
+      auto result = config_.motor->StopImmediately();
+      if (result == LibXR::ErrorCode::OK &&
+          operation == MotorDebugOperation::Disable)
+      {
+        result = config_.motor->Enable(false);
+      }
+      motor_debug_motion_active_ = false;
+      g_motor_debug_mailbox.motion_active = 0;
+      {
+        LibXR::Mutex::LockGuard lock(mutex_);
+        status_.motor_enabled = operation != MotorDebugOperation::Disable &&
+                                result == LibXR::ErrorCode::OK;
+        status_.motor_error = static_cast<int32_t>(result);
+      }
+      FinishMotorDebugRequest(request_sequence, result);
+    }
+    else
+    {
+      FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::ARG_ERR);
+    }
+  }
+
+  if (!motor_debug_motion_active_ ||
+      static_cast<uint32_t>(now_ms - motor_debug_last_poll_ms_) <
+          kMotorDebugPollPeriodMs)
+  {
+    return;
+  }
+  motor_debug_last_poll_ms_ = now_ms;
+
+  float position_degrees = 0.0F;
+  const auto read_result = config_.motor->ReadRealtimeAngle(position_degrees);
+  g_motor_debug_mailbox.last_update_ms = now_ms;
+  g_motor_debug_mailbox.sample_count =
+      g_motor_debug_mailbox.sample_count + 1U;
+  if (read_result != LibXR::ErrorCode::OK)
+  {
+    (void)config_.motor->StopImmediately();
+    motor_debug_motion_active_ = false;
+    g_motor_debug_mailbox.motion_active = 0;
+    g_motor_debug_mailbox.position_valid = 0;
+    FinishMotorDebugRequest(motor_debug_active_sequence_, read_result);
+    return;
+  }
+
+  const float position_error_degrees =
+      ShortestAngleError(position_degrees, motor_debug_active_target_degrees_);
+  g_motor_debug_mailbox.position_valid = 1;
+  g_motor_debug_mailbox.position_degrees = position_degrees;
+  g_motor_debug_mailbox.position_error_degrees = position_error_degrees;
+  {
+    LibXR::Mutex::LockGuard lock(mutex_);
+    status_.motor_position_degrees = position_degrees;
+    status_.motor_position_valid = true;
+    status_.motor_error = static_cast<int32_t>(read_result);
+  }
+
+  if (std::fabs(position_error_degrees) <= kMotorDebugPositionToleranceDegrees)
+  {
+    ++motor_debug_settled_samples_;
+  }
+  else
+  {
+    motor_debug_settled_samples_ = 0;
+  }
+
+  if (motor_debug_settled_samples_ >= kMotorDebugRequiredSettledSamples)
+  {
+    const auto stop_result = config_.motor->StopImmediately();
+    motor_debug_motion_active_ = false;
+    g_motor_debug_mailbox.motion_active = 0;
+    FinishMotorDebugRequest(motor_debug_active_sequence_, stop_result);
+  }
+  else if (static_cast<uint32_t>(now_ms - motor_debug_motion_start_ms_) >=
+           kMotorDebugMotionTimeoutMs)
+  {
+    (void)config_.motor->StopImmediately();
+    motor_debug_motion_active_ = false;
+    g_motor_debug_mailbox.motion_active = 0;
+    FinishMotorDebugRequest(motor_debug_active_sequence_, LibXR::ErrorCode::TIMEOUT);
   }
 }
 

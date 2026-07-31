@@ -63,6 +63,26 @@ class ZdtX42s
     uint32_t response_timeout_ms = 100;
   };
 
+  struct MotorConfigReadback
+  {
+    uint8_t firmware_type = 0xFF;
+    uint8_t total_bytes = 0;
+    uint8_t parameter_count = 0;
+    uint8_t motor_type = 0;
+    uint8_t pulse_port_mode = 0;
+    uint8_t communication_port_mode = 0;
+    uint8_t enable_pin_level = 0;
+    uint8_t positive_direction = 0;
+    uint8_t microstep = 0;
+    bool interpolation = false;
+    uint8_t serial_baud_rate = 0;
+    uint8_t address = 0;
+    uint8_t checksum_mode = 0;
+    uint8_t response_mode = 0;
+    uint16_t position_window_tenths_degree = 0;
+    uint32_t pulses_per_revolution = 0;
+  };
+
   // 使用默认 Config 创建驱动实例。
   explicit ZdtX42s(LibXR::UART& uart);
 
@@ -91,9 +111,12 @@ class ZdtX42s
       float target_angle_degrees, uint16_t speed_rpm, uint8_t acceleration,
       bool wait_for_reached = false, uint32_t reach_timeout_ms = 5000);
 
-  // 读取单圈实时编码器角度，成功时写入 angle_degrees。
-  // 返回值范围约为 [-360, 360)，负号由电机响应中的符号字节决定。
+  // 读取有符号多圈实时编码器角度，成功时写入 angle_degrees。
   [[nodiscard]] LibXR::ErrorCode ReadRealtimeAngle(float& angle_degrees);
+
+  // Reads the configured Emm motor parameters without enabling or moving it.
+  // A valid X-firmware response is drained and reported as NOT_SUPPORT.
+  [[nodiscard]] LibXR::ErrorCode ReadMotorConfig(MotorConfigReadback& readback);
 
   // 判断两个角度在圆周意义上是否足够接近。
   // 例如 359 度和 1 度的最短误差为 2 度，而不是 358 度。
@@ -108,6 +131,8 @@ class ZdtX42s
   static constexpr uint8_t kSetZeroCommand = 0x0A;
   static constexpr uint8_t kPositionCommand = 0xFD;
   static constexpr uint8_t kReadPositionCommand = 0x36;
+  static constexpr uint8_t kReadMotorConfigCommand = 0x42;
+  static constexpr uint8_t kReadMotorConfigAuxiliaryCode = 0x6C;
 
   // 普通命令已被驱动器接收，以及位置命令已经到位时的状态字节。
   static constexpr uint8_t kAcknowledged = 0x02;

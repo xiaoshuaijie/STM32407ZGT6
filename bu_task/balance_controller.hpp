@@ -36,6 +36,56 @@ enum class BalanceFault : uint8_t
   Configuration,
 };
 
+enum class MotorDebugOperation : uint32_t
+{
+  Idle = 0,
+  ReadPosition = 1,
+  SetCurrentPositionZero = 2,
+  MoveAbsolute = 3,
+  Stop = 4,
+  Disable = 5,
+  ReadMotorConfig = 6,
+};
+
+inline constexpr uint32_t kMotorDebugUnlockKey = 0x58423432U;
+inline constexpr int32_t kMotorDebugPendingResult = (-2147483647 - 1);
+
+struct MotorDebugMailbox
+{
+  volatile uint32_t unlock_key = 0;
+  volatile uint32_t request_sequence = 0;
+  volatile uint32_t completed_sequence = 0;
+  volatile uint32_t operation = static_cast<uint32_t>(MotorDebugOperation::Idle);
+  volatile float target_degrees = 0.0F;
+  volatile uint32_t speed_rpm = 30;
+  volatile uint32_t acceleration = 20;
+  volatile int32_t result = kMotorDebugPendingResult;
+  volatile uint32_t position_valid = 0;
+  volatile float position_degrees = 0.0F;
+  volatile float position_error_degrees = 0.0F;
+  volatile uint32_t sample_count = 0;
+  volatile uint32_t zeroed = 0;
+  volatile uint32_t motion_active = 0;
+  volatile uint32_t config_valid = 0;
+  volatile uint32_t config_firmware_type = 0xFF;
+  volatile uint32_t config_total_bytes = 0;
+  volatile uint32_t config_parameter_count = 0;
+  volatile uint32_t config_motor_type = 0;
+  volatile uint32_t config_microstep = 0;
+  volatile uint32_t config_pulses_per_revolution = 0;
+  volatile uint32_t config_address = 0;
+  volatile uint32_t config_serial_baud_rate = 0;
+  volatile uint32_t config_checksum_mode = 0;
+  volatile uint32_t config_response_mode = 0;
+  volatile uint32_t config_position_window_tenths_degree = 0;
+  volatile uint32_t last_update_ms = 0;
+};
+
+extern "C"
+{
+extern volatile MotorDebugMailbox g_motor_debug_mailbox;
+}
+
 struct BalanceStatus
 {
   ContestTask selected_task = ContestTask::Monitor;
@@ -97,11 +147,15 @@ class BalanceController
  private:
   void HandleRequests();
   void StartTask();
+  void StartViewMotorTest();
   void AbortTask(BalanceFault fault);
   void CompleteTask();
   void UpdateControl(uint32_t now_ms);
+  void UpdateViewMotorTest(uint32_t now_ms);
   void UpdateMonitorStatus(uint32_t now_ms);
   void UpdateMotorPosition(uint32_t now_ms);
+  void HandleMotorDebugMailbox(uint32_t now_ms);
+  void FinishMotorDebugRequest(uint32_t sequence, LibXR::ErrorCode result);
   void UpdateTaskTarget(uint32_t now_ms);
   void SetFault(BalanceFault fault, LibXR::ErrorCode motor_error);
   void PublishStatus();
@@ -120,8 +174,19 @@ class BalanceController
   bool motion_command_active_ = false;
   uint32_t task_start_time_ms_ = 0;
   uint32_t target_settle_start_ms_ = 0;
+  uint32_t view_test_phase_start_ms_ = 0;
+  uint32_t view_test_last_position_poll_ms_ = 0;
+  bool view_test_reverse_requested_ = false;
   uint32_t last_motor_position_poll_ms_ = 0;
   float last_command_angle_degrees_ = 0.0F;
+  uint32_t motor_debug_seen_sequence_ = 0;
+  uint32_t motor_debug_active_sequence_ = 0;
+  uint32_t motor_debug_motion_start_ms_ = 0;
+  uint32_t motor_debug_last_poll_ms_ = 0;
+  float motor_debug_active_target_degrees_ = 0.0F;
+  uint8_t motor_debug_settled_samples_ = 0;
+  bool motor_debug_zeroed_ = false;
+  bool motor_debug_motion_active_ = false;
 };
 
 void BalanceControlThread(BalanceController* controller);

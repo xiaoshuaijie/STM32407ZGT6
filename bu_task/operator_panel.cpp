@@ -50,11 +50,12 @@ void OperatorPanel::Run()
       LibXR::Thread::GetTime() - config_.display_period_ms;
   while (true)
   {
-    if (select_button_.Update(config_.select_button->Read()))
+    // PA4/PA5 use internal pull-ups, so a pressed button reads low.
+    if (select_button_.Update(!config_.select_button->Read()))
     {
       config_.controller->SelectNextTask();
     }
-    if (run_button_.Update(config_.run_button->Read()))
+    if (run_button_.Update(!config_.run_button->Read()))
     {
       config_.controller->ToggleRun();
     }

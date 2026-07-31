@@ -18,7 +18,8 @@
 | `StopImmediately()` | `FE 98 sync` | 安全停止当前运动。 |
 | `SetCurrentPositionAsZero()` | `0A 6D` | 将当前摆杆角度定义为电机零点。 |
 | `MoveToAbsoluteAngle(...)` | `FD direction speed acceleration pulses mode sync` | Emm 绝对位置运动，自动将角度转换为脉冲数。 |
-| `ReadRealtimeAngle(...)` | `36` | 读取 Emm 单圈编码器角度。 |
+| `ReadRealtimeAngle(...)` | `36` | 读取 Emm 有符号多圈编码器角度。 |
+| `ReadMotorConfig(...)` | `42 6C` | 只读查询 Emm 电机类型、细分、地址和通讯配置，不使能或运动电机。 |
 
 所有命令均通过项目的 `LibXR::UART` 串行执行。驱动会等待确认帧、校验地址/功能码/校验字节，并将手册规定的状态字节映射为 `LibXR::ErrorCode`。正常平衡控制仅允许 `BalanceController` 线程访问 USART3，不应由其他线程同时发送电机命令。
 

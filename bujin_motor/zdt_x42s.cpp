@@ -10,8 +10,8 @@ namespace
 {
 
 // 读取实时位置响应时，第三字节表示后续位置值的符号。
-constexpr uint8_t kNegativeSign = 0;
-constexpr uint8_t kPositiveSign = 1;
+constexpr uint8_t kPositiveSign = 0;
+constexpr uint8_t kNegativeSign = 1;
 
 // FD 位置命令的模式和同步执行字段。该驱动固定使用绝对位置、立即执行。
 constexpr uint8_t kAbsolutePositionMode = 1;
@@ -61,6 +61,34 @@ uint32_t ReadBigEndian32(const uint8_t* source)
          (static_cast<uint32_t>(source[2]) << 8U) |
          static_cast<uint32_t>(source[3]);
 }
+
+uint16_t ReadBigEndian16(const uint8_t* source)
+{
+  return static_cast<uint16_t>((static_cast<uint16_t>(source[0]) << 8U) |
+                               static_cast<uint16_t>(source[1]));
+}
+
+constexpr int64_t SignedPositionCounts(uint8_t sign, uint32_t magnitude)
+{
+  return sign == kNegativeSign ? -static_cast<int64_t>(magnitude)
+                               : static_cast<int64_t>(magnitude);
+}
+
+constexpr uint32_t PulsesPerRevolution(uint8_t motor_type, uint8_t microstep)
+{
+  const uint32_t full_steps = motor_type == 0x19U ? 200U :
+                              motor_type == 0x32U ? 400U : 0U;
+  const uint32_t effective_microstep = microstep == 0U ? 256U : microstep;
+  return full_steps * effective_microstep;
+}
+
+static_assert(PulsesPerRevolution(0x19U, 16U) == 3200U);
+static_assert(PulsesPerRevolution(0x19U, 32U) == 6400U);
+static_assert(PulsesPerRevolution(0x32U, 16U) == 6400U);
+static_assert(PulsesPerRevolution(0x19U, 0U) == 51200U);
+static_assert(SignedPositionCounts(kPositiveSign, 65536U) == 65536);
+static_assert(SignedPositionCounts(kNegativeSign, 65536U) == -65536);
+static_assert(SignedPositionCounts(kPositiveSign, 131072U) == 131072);
 
 }  // namespace
 
@@ -229,18 +257,105 @@ LibXR::ErrorCode ZdtX42s::ReadRealtimeAngle(float& angle_degrees)
     return LibXR::ErrorCode::CHECK_ERR;
   }
 
-  // 单圈编码器分辨率为 65536；大于 65535 的值违反协议范围。
   const uint32_t raw_position = ReadBigEndian32(&response[3]);
-  if (raw_position > 65535U)
+  const int64_t signed_position = SignedPositionCounts(response[2], raw_position);
+  angle_degrees = static_cast<float>(static_cast<double>(signed_position) *
+                                     360.0 / 65536.0);
+  return LibXR::ErrorCode::OK;
+}
+
+LibXR::ErrorCode ZdtX42s::ReadMotorConfig(MotorConfigReadback& readback)
+{
+  readback = {};
+  if (!HasValidConfig())
   {
-    return LibXR::ErrorCode::OUT_OF_RANGE;
+    return LibXR::ErrorCode::ARG_ERR;
   }
 
-  // 将 [0, 65535] 映射到 [0, 360)，再按符号字节恢复负角度。
-  angle_degrees = static_cast<float>(raw_position) * 360.0F / 65536.0F;
-  if (response[2] == kNegativeSign)
+  std::array<uint8_t, 4> command = {
+      config_.address,
+      kReadMotorConfigCommand,
+      kReadMotorConfigAuxiliaryCode,
+      0,
+  };
+  AppendChecksum(command.data(), command.size());
+
+  auto result = Send(command.data(), command.size());
+  if (result != LibXR::ErrorCode::OK)
   {
-    angle_degrees = -angle_degrees;
+    return result;
+  }
+
+  constexpr size_t kEmmResponseSize = 33U;
+  constexpr size_t kXResponseSize = 37U;
+  constexpr uint8_t kEmmParameterCount = 0x15U;
+  constexpr uint8_t kXParameterCount = 0x18U;
+  std::array<uint8_t, kXResponseSize> response{};
+  result = Read(response.data(), 4U, config_.response_timeout_ms);
+  if (result != LibXR::ErrorCode::OK)
+  {
+    return result;
+  }
+  if (response[0] != config_.address ||
+      response[1] != kReadMotorConfigCommand ||
+      (response[2] != kEmmResponseSize && response[2] != kXResponseSize))
+  {
+    return LibXR::ErrorCode::CHECK_ERR;
+  }
+
+  const size_t response_size = response[2];
+  result = Read(response.data() + 4U, response_size - 4U,
+                config_.response_timeout_ms);
+  if (result != LibXR::ErrorCode::OK)
+  {
+    return result;
+  }
+  if (!HasValidChecksum(response.data(), response_size))
+  {
+    return LibXR::ErrorCode::CHECK_ERR;
+  }
+
+  readback.total_bytes = response[2];
+  readback.parameter_count = response[3];
+  if (response_size == kXResponseSize)
+  {
+    readback.firmware_type = 0U;
+    return response[3] == kXParameterCount ? LibXR::ErrorCode::NOT_SUPPORT
+                                           : LibXR::ErrorCode::CHECK_ERR;
+  }
+  readback.firmware_type = 1U;
+  if (response[3] != kEmmParameterCount)
+  {
+    return LibXR::ErrorCode::CHECK_ERR;
+  }
+
+  readback.motor_type = response[4];
+  readback.pulse_port_mode = response[5];
+  readback.communication_port_mode = response[6];
+  readback.enable_pin_level = response[7];
+  readback.positive_direction = response[8];
+  readback.microstep = response[9];
+  readback.interpolation = response[10] != 0U;
+  readback.serial_baud_rate = response[18];
+  readback.address = response[20];
+  readback.checksum_mode = response[21];
+  readback.response_mode = response[22];
+  readback.position_window_tenths_degree = ReadBigEndian16(&response[30]);
+  readback.pulses_per_revolution =
+      PulsesPerRevolution(readback.motor_type, readback.microstep);
+
+  if (readback.pulses_per_revolution == 0U ||
+      readback.pulse_port_mode > 4U ||
+      readback.communication_port_mode > 4U ||
+      readback.enable_pin_level > 2U ||
+      readback.positive_direction > 1U ||
+      response[10] > 1U ||
+      readback.serial_baud_rate > 8U ||
+      readback.address != config_.address ||
+      readback.checksum_mode > 4U ||
+      readback.response_mode > 4U)
+  {
+    return LibXR::ErrorCode::OUT_OF_RANGE;
   }
   return LibXR::ErrorCode::OK;
 }
