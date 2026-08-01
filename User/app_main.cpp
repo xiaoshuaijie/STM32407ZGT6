@@ -157,13 +157,16 @@ extern "C" void app_main(void) {
 
   // T3 PID：第一阶段，目标位置为 +5 cm。
   // 位置比例增益，单位为“度/厘米”。
-  balance_config.task3_positive_pid.position_gain_degrees_per_cm = -2.4F;
+  balance_config.task3_positive_pid.position_gain_degrees_per_cm = -2.3F;
   // 位置积分增益，单位为“度/(厘米*秒)”。
-  balance_config.task3_positive_pid.integral_gain_degrees_per_cm_s = -0.4F;
+  balance_config.task3_positive_pid.integral_gain_degrees_per_cm_s = -0.0F;
   // 积分项最多贡献的角度，单位为度。
   balance_config.task3_positive_pid.integral_limit_degrees = 2.0F;
   // 速度反馈增益，乘数输入为 pixel/s。
   balance_config.task3_positive_pid.velocity_gain_degrees_per_pixel_s = -0.020F;
+  // 微分增益，对位置误差求导，单位为“度/(厘米/秒)”。
+  balance_config.task3_positive_pid.derivative_gain_degrees_per_cm_s =
+      0.0F; // d
   // 最小允许目标角度，单位为度。
   balance_config.task3_positive_pid.min_angle_degrees = -5.0F;
   // 最大允许目标角度，单位为度。
@@ -175,13 +178,16 @@ extern "C" void app_main(void) {
 
   // T3 PID：第二阶段，目标位置为 -5 cm。
   // 位置比例增益，单位为“度/厘米”。
-  balance_config.task3_negative_pid.position_gain_degrees_per_cm = -2.4F;
+  balance_config.task3_negative_pid.position_gain_degrees_per_cm = -0.5F;
   // 位置积分增益，单位为“度/(厘米*秒)”。
-  balance_config.task3_negative_pid.integral_gain_degrees_per_cm_s = -0.4F;
+  balance_config.task3_negative_pid.integral_gain_degrees_per_cm_s = -0.0F;
   // 积分项最多贡献的角度，单位为度。
   balance_config.task3_negative_pid.integral_limit_degrees = 2.0F;
   // 速度反馈增益，乘数输入为 pixel/s。
   balance_config.task3_negative_pid.velocity_gain_degrees_per_pixel_s = -0.020F;
+  // 微分增益，对位置误差求导，单位为“度/(厘米/秒)”。
+  balance_config.task3_negative_pid.derivative_gain_degrees_per_cm_s =
+      0.0F; // d
   // 最小允许目标角度，单位为度。
   balance_config.task3_negative_pid.min_angle_degrees = -5.0F;
   // 最大允许目标角度，单位为度。
@@ -193,17 +199,19 @@ extern "C" void app_main(void) {
 
   // T4 PID：目标位置为 0 cm。
   // 位置比例增益，单位为“度/厘米”。
-  balance_config.task4_pid.position_gain_degrees_per_cm = -2.4F;
+  balance_config.task4_pid.position_gain_degrees_per_cm = -3.0F; // p
   // 位置积分增益，单位为“度/(厘米*秒)”。
-  balance_config.task4_pid.integral_gain_degrees_per_cm_s = -0.4F;
+  balance_config.task4_pid.integral_gain_degrees_per_cm_s = -0.0F; // i
   // 积分项最多贡献的角度，单位为度。
-  balance_config.task4_pid.integral_limit_degrees = 2.0F;
+  balance_config.task4_pid.integral_limit_degrees = 4.0F; // 积分限幅
   // 速度反馈增益，乘数输入为 pixel/s。
-  balance_config.task4_pid.velocity_gain_degrees_per_pixel_s = -0.020F;
+  balance_config.task4_pid.velocity_gain_degrees_per_pixel_s = -0.030F; //
+  // 微分增益，对位置误差求导，单位为“度/(厘米/秒)”。
+  balance_config.task4_pid.derivative_gain_degrees_per_cm_s = 0.0F; // d
   // 最小允许目标角度，单位为度。
-  balance_config.task4_pid.min_angle_degrees = -5.0F;
+  balance_config.task4_pid.min_angle_degrees = -5.0F; // mix
   // 最大允许目标角度，单位为度。
-  balance_config.task4_pid.max_angle_degrees = 7.0F;
+  balance_config.task4_pid.max_angle_degrees = 7.0F; // max
   // 相邻两次目标角度变化小于该值时不重复发送电机指令。
   balance_config.task4_pid.minimum_command_delta_degrees = 0.15F;
   // 接受视觉测量的最低置信度，取值范围为 [0, 1]。
@@ -211,13 +219,15 @@ extern "C" void app_main(void) {
 
   // T5 PID：目标位置为 0 cm。
   // 位置比例增益，单位为“度/厘米”。
-  balance_config.task5_pid.position_gain_degrees_per_cm = -2.4F;
+  balance_config.task5_pid.position_gain_degrees_per_cm = -1.75F;
   // 位置积分增益，单位为“度/(厘米*秒)”。
-  balance_config.task5_pid.integral_gain_degrees_per_cm_s = -0.4F;
+  balance_config.task5_pid.integral_gain_degrees_per_cm_s = -0.0F;
   // 积分项最多贡献的角度，单位为度。
   balance_config.task5_pid.integral_limit_degrees = 2.0F;
   // 速度反馈增益，乘数输入为 pixel/s。
   balance_config.task5_pid.velocity_gain_degrees_per_pixel_s = -0.020F;
+  // 微分增益，对位置误差求导，单位为“度/(厘米/秒)”。
+  balance_config.task5_pid.derivative_gain_degrees_per_cm_s = 0.0F; // d
   // 最小允许目标角度，单位为度。
   balance_config.task5_pid.min_angle_degrees = -5.0F;
   // 最大允许目标角度，单位为度。
@@ -229,11 +239,11 @@ extern "C" void app_main(void) {
 
   // T6 PID：目标位置为 task6_target_cm。
   // 位置比例增益，单位为“度/厘米”。
-  balance_config.task6_pid.position_gain_degrees_per_cm = -2.4F;
+  balance_config.task6_pid.position_gain_degrees_per_cm = -1.6F;
   // 位置积分增益，单位为“度/(厘米*秒)”。
   balance_config.task6_pid.integral_gain_degrees_per_cm_s = -0.4F;
   // 积分项最多贡献的角度，单位为度。
-  balance_config.task6_pid.integral_limit_degrees = 2.0F;
+  balance_config.task6_pid.integral_limit_degrees = 0.0F;
   // 速度反馈增益，乘数输入为 pixel/s。
   balance_config.task6_pid.velocity_gain_degrees_per_pixel_s = -0.020F;
   // 最小允许目标角度，单位为度。
@@ -252,8 +262,8 @@ extern "C" void app_main(void) {
   balance_config.max_abs_position_cm = 13.5F;
   // 任务 6 的球位置目标，单位为厘米；正负方向由相机位置坐标系的定义决定。
   balance_config.task6_target_cm = 3.0F;
-  // 正式平衡使用 FB 直通限速位置模式；该值是追赶目标角度的速度上限，单位为 rpm。
-  // FD 回零/恢复动作也复用该速度值。
+  // 正式平衡使用 FB 直通限速位置模式；该值是追赶目标角度的速度上限，单位为
+  // rpm。 FD 回零/恢复动作也复用该速度值。
   balance_config.motor_speed_rpm = 120;
   // FD 回零/恢复动作的梯形曲线加速度；FB 正式平衡命令不使用该参数。
   balance_config.motor_acceleration = 240;

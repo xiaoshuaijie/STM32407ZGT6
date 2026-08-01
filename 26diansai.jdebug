@@ -61,6 +61,7 @@ void OnProjectLoad (void) {
   Watch.Add ("g_motor_debug_mailbox.control_angle_offset_degrees");
   Watch.Add ("g_motor_debug_mailbox.control_position_gain_degrees_per_cm");
   Watch.Add ("g_motor_debug_mailbox.control_velocity_gain_degrees_per_pixel_s");
+  Watch.Add ("g_motor_debug_mailbox.control_derivative_gain_degrees_per_cm_s");
   Watch.Add ("g_motor_debug_mailbox.control_angle_limit_degrees");
   Watch.Add ("g_motor_debug_mailbox.control_minimum_command_delta_degrees");
   Watch.Add ("g_motor_debug_mailbox.last_update_ms");

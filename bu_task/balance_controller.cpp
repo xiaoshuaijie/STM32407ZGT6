@@ -8,10 +8,10 @@ namespace BuTask
 namespace
 {
 
-constexpr uint32_t kTask3TimeLimitMs = 5000;
-constexpr uint32_t kTask4TimeLimitMs = 8000;
-constexpr uint32_t kLapTimeLimitMs = 30000;
-constexpr float kTask6TargetStepCm = 1.0F;
+constexpr uint32_t kTask3TimeLimitMs = 25000;
+constexpr uint32_t kTask4TimeLimitMs = 28000;
+constexpr uint32_t kLapTimeLimitMs = 50000;
+constexpr float kTask6TargetStepCm = 0.5F;
 constexpr uint8_t kTask3MovePositive = 1;
 constexpr uint8_t kTask3MoveNegative = 2;
 constexpr uint8_t kViewTestMovePositive = 3;
@@ -36,6 +36,7 @@ constexpr float kControlTuningMaxAbsPositionGain = 10.0F;
 constexpr float kControlTuningMaxAbsIntegralGain = 2.0F;
 constexpr float kControlTuningMaxIntegralLimitDegrees = 10.0F;
 constexpr float kControlTuningMaxAbsVelocityGain = 0.5F;
+constexpr float kControlTuningMaxAbsDerivativeGain = 5.0F;
 constexpr float kControlTuningMinAngleLimitDegrees = 1.0F;
 constexpr float kControlTuningMaxAngleLimitDegrees = 20.0F;
 constexpr float kControlTuningMaxCommandDeltaDegrees = 5.0F;
@@ -86,6 +87,8 @@ BalanceController::BalanceController(BalanceControllerConfig config)
       profile.integral_limit_degrees;
   g_motor_debug_mailbox.control_velocity_gain_degrees_per_pixel_s =
       profile.velocity_gain_degrees_per_pixel_s;
+  g_motor_debug_mailbox.control_derivative_gain_degrees_per_cm_s =
+      profile.derivative_gain_degrees_per_cm_s;
   g_motor_debug_mailbox.control_angle_limit_degrees =
       std::max(std::fabs(profile.min_angle_degrees),
                std::fabs(profile.max_angle_degrees));
@@ -433,6 +436,7 @@ void BalanceController::StartTask()
     motion_command_active_ = false;
     last_command_angle_degrees_ = 0.0F;
     position_error_integral_cm_s_ = 0.0F;
+    has_last_position_error_ = false;
     last_control_time_ms_ = now_ms;
     control_command_count_ = 0;
   }
@@ -526,6 +530,7 @@ void BalanceController::AbortTask(BalanceFault fault)
     motion_command_active_ = false;
     target_settle_start_ms_ = 0;
     position_error_integral_cm_s_ = 0.0F;
+    has_last_position_error_ = false;
     last_control_time_ms_ = 0;
   }
   PublishStatus();
@@ -536,16 +541,21 @@ void BalanceController::CompleteTask()
   const auto stop_result = config_.motor->StopImmediately();
   {
     LibXR::Mutex::LockGuard lock(mutex_);
-    status_.run_state = stop_result == LibXR::ErrorCode::OK
-                            ? BalanceRunState::Completed
-                            : BalanceRunState::Fault;
-    status_.fault = stop_result == LibXR::ErrorCode::OK ? BalanceFault::None
-                                                         : BalanceFault::MotorCommand;
+    const bool motor_ok = stop_result == LibXR::ErrorCode::OK;
+    // T3–T6 only expose READY and RUN: a finished contest task returns to
+    // READY instead of entering the DONE (Completed) state. Only VIEW keeps
+    // its DONE indication.
+    const BalanceRunState success_state =
+        status_.selected_task == ContestTask::Monitor ? BalanceRunState::Completed
+                                                      : BalanceRunState::Ready;
+    status_.run_state = motor_ok ? success_state : BalanceRunState::Fault;
+    status_.fault = motor_ok ? BalanceFault::None : BalanceFault::MotorCommand;
     status_.motor_error = static_cast<int32_t>(stop_result);
-    status_.motor_enabled = stop_result == LibXR::ErrorCode::OK;
+    status_.motor_enabled = motor_ok;
     status_.task_phase = 0;
     motion_command_active_ = false;
     position_error_integral_cm_s_ = 0.0F;
+    has_last_position_error_ = false;
     last_control_time_ms_ = 0;
   }
   PublishStatus();
@@ -676,13 +686,11 @@ void BalanceController::UpdateControl(uint32_t now_ms)
   {
     if (selected_task == ContestTask::Task3)
     {
+      // T3 now holds its final target until the RUN time limit, so reaching the
+      // limit is a normal finish (→ READY), not a timeout fault.
       g_motor_debug_mailbox.task_start_stage = 0xE3;  // T3 time limit elapsed.
-      AbortTask(BalanceFault::TaskTimeout);
     }
-    else
-    {
-      CompleteTask();
-    }
+    CompleteTask();
     return;
   }
 
@@ -759,10 +767,27 @@ void BalanceController::UpdateControl(uint32_t now_ms)
   const float integral_angle =
       active_profile.integral_gain_degrees_per_cm_s *
       position_error_integral_cm_s_;
+
+  // 微分项：对位置误差求时间导数。首个控制周期或无有效历史误差时不产生贡献，
+  // 避免误差跳变导致的冲击。
+  float derivative_angle = 0.0F;
+  if (has_last_position_error_ && control_elapsed_ms > 0U &&
+      std::fabs(active_profile.derivative_gain_degrees_per_cm_s) > 0.000001F)
+  {
+    const float error_rate_cm_s =
+        (position_error_cm - last_position_error_cm_) /
+        (static_cast<float>(control_elapsed_ms) * 0.001F);
+    derivative_angle =
+        active_profile.derivative_gain_degrees_per_cm_s * error_rate_cm_s;
+  }
+  last_position_error_cm_ = position_error_cm;
+  has_last_position_error_ = true;
+
   const float unconstrained_angle = config_.angle_offset_degrees +
                                     active_profile.position_gain_degrees_per_cm *
                                         position_error_cm +
                                     integral_angle +
+                                    derivative_angle +
                                     active_profile.velocity_gain_degrees_per_pixel_s *
                                         measurement.velocity_pixel_s;
   if (!std::isfinite(unconstrained_angle))
@@ -1036,6 +1061,8 @@ void BalanceController::HandleMotorDebugMailbox(uint32_t now_ms)
         g_motor_debug_mailbox.control_integral_limit_degrees;
     const float control_velocity_gain_degrees_per_pixel_s =
         g_motor_debug_mailbox.control_velocity_gain_degrees_per_pixel_s;
+    const float control_derivative_gain_degrees_per_cm_s =
+        g_motor_debug_mailbox.control_derivative_gain_degrees_per_cm_s;
     const float control_angle_limit_degrees =
         g_motor_debug_mailbox.control_angle_limit_degrees;
     const float control_minimum_command_delta_degrees =
@@ -1110,6 +1137,7 @@ void BalanceController::HandleMotorDebugMailbox(uint32_t now_ms)
           !std::isfinite(control_integral_gain_degrees_per_cm_s) ||
           !std::isfinite(control_integral_limit_degrees) ||
           !std::isfinite(control_velocity_gain_degrees_per_pixel_s) ||
+          !std::isfinite(control_derivative_gain_degrees_per_cm_s) ||
           !std::isfinite(control_angle_limit_degrees) ||
           !std::isfinite(control_minimum_command_delta_degrees) ||
           std::fabs(control_angle_offset_degrees) >
@@ -1123,6 +1151,8 @@ void BalanceController::HandleMotorDebugMailbox(uint32_t now_ms)
               kControlTuningMaxIntegralLimitDegrees ||
           std::fabs(control_velocity_gain_degrees_per_pixel_s) >
               kControlTuningMaxAbsVelocityGain ||
+          std::fabs(control_derivative_gain_degrees_per_cm_s) >
+              kControlTuningMaxAbsDerivativeGain ||
           control_angle_limit_degrees <
               kControlTuningMinAngleLimitDegrees ||
           control_angle_limit_degrees >
@@ -1146,11 +1176,14 @@ void BalanceController::HandleMotorDebugMailbox(uint32_t now_ms)
             control_integral_limit_degrees;
         selected_profile->velocity_gain_degrees_per_pixel_s =
             control_velocity_gain_degrees_per_pixel_s;
+        selected_profile->derivative_gain_degrees_per_cm_s =
+            control_derivative_gain_degrees_per_cm_s;
         selected_profile->min_angle_degrees = -control_angle_limit_degrees;
         selected_profile->max_angle_degrees = control_angle_limit_degrees;
         selected_profile->minimum_command_delta_degrees =
             control_minimum_command_delta_degrees;
         position_error_integral_cm_s_ = 0.0F;
+        has_last_position_error_ = false;
         last_control_time_ms_ = 0;
         g_motor_debug_mailbox.control_tuning_valid = 1;
         FinishMotorDebugRequest(request_sequence, LibXR::ErrorCode::OK);
@@ -1409,12 +1442,15 @@ void BalanceController::UpdateTaskTarget(uint32_t now_ms)
       target_settle_start_ms_ = 0;
       motion_command_active_ = false;
       position_error_integral_cm_s_ = 0.0F;
+      has_last_position_error_ = false;
       last_control_time_ms_ = now_ms;
     }
     PublishStatus();
     return;
   }
-  CompleteTask();
+  // Final target (task3_negative_cm) reached and settled. Do not finish here:
+  // keep holding the target with PID until the RUN time limit elapses, matching
+  // T4/T5/T6 which hold their target for the whole RUN window.
 }
 
 void BalanceController::SetFault(BalanceFault fault, LibXR::ErrorCode motor_error)
@@ -1427,6 +1463,7 @@ void BalanceController::SetFault(BalanceFault fault, LibXR::ErrorCode motor_erro
     status_.task_phase = 0;
     motion_command_active_ = false;
     position_error_integral_cm_s_ = 0.0F;
+    has_last_position_error_ = false;
     last_control_time_ms_ = 0;
   }
   PublishStatus();
@@ -1490,6 +1527,7 @@ bool BalanceController::IsControlProfileValid(
          std::isfinite(profile.integral_limit_degrees) &&
          profile.integral_limit_degrees >= 0.0F &&
          std::isfinite(profile.velocity_gain_degrees_per_pixel_s) &&
+         std::isfinite(profile.derivative_gain_degrees_per_cm_s) &&
          std::isfinite(profile.min_angle_degrees) &&
          std::isfinite(profile.max_angle_degrees) &&
          profile.min_angle_degrees <= profile.max_angle_degrees &&

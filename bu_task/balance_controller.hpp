@@ -96,6 +96,7 @@ struct MotorDebugMailbox
   volatile float control_integral_gain_degrees_per_cm_s = 0.0F;
   volatile float control_integral_limit_degrees = 3.0F;
   volatile float control_velocity_gain_degrees_per_pixel_s = 0.0F;
+  volatile float control_derivative_gain_degrees_per_cm_s = 0.0F;
   volatile float control_angle_limit_degrees = 20.0F;
   volatile float control_minimum_command_delta_degrees = 0.2F;
   // Live task-path snapshot for Ozone. These fields are telemetry only and
@@ -174,6 +175,8 @@ struct BalanceControlProfile
   float integral_gain_degrees_per_cm_s = 0.0F;
   float integral_limit_degrees = 3.0F;
   float velocity_gain_degrees_per_pixel_s = 0.0F;
+  // 微分增益：对位置误差 (cm) 求时间导数，单位为“度/(厘米/秒)”。
+  float derivative_gain_degrees_per_cm_s = 0.0F;
   float min_angle_degrees = -20.0F;
   float max_angle_degrees = 20.0F;
   float minimum_command_delta_degrees = 0.2F;
@@ -281,6 +284,8 @@ class BalanceController
   bool motor_configuration_valid_ = false;
   float last_command_angle_degrees_ = 0.0F;
   float position_error_integral_cm_s_ = 0.0F;
+  float last_position_error_cm_ = 0.0F;
+  bool has_last_position_error_ = false;
   uint32_t last_control_time_ms_ = 0;
   uint32_t control_command_count_ = 0;
   uint32_t motor_debug_seen_sequence_ = 0;
