@@ -1,0 +1,23 @@
+# Findings
+
+- The user requires explicit per-task/per-stage assignments and specifically forbids replacing them with a loop.
+- T3 needs two independent parameter sets: one for the +5 cm phase and one for the -5 cm phase.
+- `BalanceControllerConfig` currently owns one shared set of position, integral, velocity, angle-limit, command-delta, and confidence fields used by all tasks.
+- The state model already defines T3 phase 1 (`kTask3MovePositive`) and phase 2 (`kTask3MoveNegative`); startup sets the T3 reference to `task3_positive_cm`.
+- `UpdateControl()` reads all control coefficients directly from the shared `config_`, so a task/stage selection function is needed before computing validity, neutral commands, and PID output.
+- Runtime Ozone tuning currently mutates that same shared set and must be reconciled with task-specific ownership.
+- The T3 transition is explicitly suppressed when `OZONE_T3_HOLD_POSITIVE_TARGET` is defined: `UpdateTaskTarget()` returns after settling at +5 cm, and `TimeLimitMs()` extends T3 to 30 seconds. This exactly explains an `R` value that remains +5 cm.
+- The normal T3 transition resets the integral accumulator, command-active flag, and control timestamp when switching to -5 cm; that reset behavior should be retained for the second PID profile.
+- T4 and T5 target 0 cm, while T6 uses `task6_target_cm`; all currently use the same shared coefficients.
+- The active Debug cache has `OZONE_AUTOMATED_RUN_TASK=3` and `OZONE_T3_HOLD_POSITIVE_TARGET=ON`, confirming that the compiled image intentionally holds T3 at +5 cm.
+- The new ownership will use five explicit profiles: T3 positive, T3 negative, T4, T5, and T6. All profiles start with the user's supplied values because no distinct numeric values were supplied yet.
+- Profile selection will use the selected task plus T3 phase. No configuration-generation loop will be introduced.
+- The legacy Ozone `ApplyControlTuning` command can remain backward-compatible by explicitly applying its one tuning payload to all five profiles; compile-time profiles remain independently assignable.
+- The T3 hold CMake option and source branches have been removed so a stale cache value can no longer suppress the +5 cm to -5 cm transition.
+- Static verification found eight explicit assignments for each of the five profiles in `User/app_main.cpp`.
+- `ControlProfileFor()` maps T3 phase 2 to `task3_negative_pid`, phase 1/default to `task3_positive_pid`, and maps T4/T5/T6 to their own profiles.
+- Neither source nor `compile_commands.json` contains `OZONE_T3_HOLD_POSITIVE_TARGET` after regeneration.
+- The Debug cache still contained an old automated T3 run, relevel, and `-1` zero-recovery setup. These must be restored to normal manual-operation values for the final firmware.
+- The final T3 path sets phase 2, reference `task3_negative_cm`, clears the integral and command state, and keeps the ordinary 5-second T3 limit.
+- Applying one Ozone tuning payload to all five profiles would undermine profile independence. The mailbox needs an explicit profile selector and a switch that mutates only the selected profile.
+- Runtime tuning now uses `control_profile` values 0 through 4 and an explicit switch to mutate only T3+, T3-, T4, T5, or T6 respectively.

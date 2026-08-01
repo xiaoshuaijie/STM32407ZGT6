@@ -1,63 +1,48 @@
 
 
-OpenDocument="tasks.c", FilePath="E:/stm32cubemx exe/26diansai/Middlewares/Third_Party/FreeRTOS/Source/tasks.c", Line=3640
-OpenDocument="stm32f4xx_hal.c", FilePath="E:/stm32cubemx exe/26diansai/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c", Line=316
-OpenDocument="stm32f4xx_hal_spi.c", FilePath="E:/stm32cubemx exe/26diansai/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c", Line=3499
+OpenDocument="tasks.c", FilePath="E:/stm32cubemx exe/26diansai/Middlewares/Third_Party/FreeRTOS/Source/tasks.c", Line=3427
+OpenDocument="stm32f4xx_hal_spi.c", FilePath="E:/stm32cubemx exe/26diansai/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.c", Line=868
+OpenDocument="stm32_gpio.hpp", FilePath="E:/stm32cubemx exe/26diansai/Middlewares/Third_Party/LibXR/driver/st/stm32_gpio.hpp", Line=65
+OpenDocument="stm32_spi.cpp", FilePath="E:/stm32cubemx exe/26diansai/Middlewares/Third_Party/LibXR/driver/st/stm32_spi.cpp", Line=503
+OpenDocument="stm32f4xx_hal.c", FilePath="E:/stm32cubemx exe/26diansai/Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.c", Line=153
+OpenDocument="balance_controller.hpp", FilePath="E:/stm32cubemx exe/26diansai/bu_task/balance_controller.hpp", Line=77
+OpenDocument="main.c", FilePath="E:/stm32cubemx exe/26diansai/Core/Src/main.c", Line=75
+OpenDocument="lcd_port.c", FilePath="E:/stm32cubemx exe/26diansai/LCD/lcd_port.c", Line=48
 OpenDocument="lcd_libxr_port.cpp", FilePath="E:/stm32cubemx exe/26diansai/LCD/lcd_libxr_port.cpp", Line=0
 OpenDocument="balance_controller.cpp", FilePath="E:/stm32cubemx exe/26diansai/bu_task/balance_controller.cpp", Line=582
 OpenDocument="thread.hpp", FilePath="E:/stm32cubemx exe/26diansai/Middlewares/Third_Party/LibXR/system/freertos/thread.hpp", Line=115
-OpenDocument="startup_stm32f407xx.s", FilePath="E:/stm32cubemx exe/26diansai/startup_stm32f407xx.s", Line=53
+OpenDocument="lcd_core.c", FilePath="E:/stm32cubemx exe/26diansai/LCD/lcd_core.c", Line=299
 OpenDocument="queue.c", FilePath="E:/stm32cubemx exe/26diansai/Middlewares/Third_Party/FreeRTOS/Source/queue.c", Line=1440
-OpenDocument="main.c", FilePath="E:/stm32cubemx exe/26diansai/Core/Src/main.c", Line=74
+OpenDocument="startup_stm32f407xx.s", FilePath="E:/stm32cubemx exe/26diansai/startup_stm32f407xx.s", Line=56
 OpenToolbar="Debug", Floating=0, x=0, y=0
-OpenWindow="Call Stack", DockArea=RIGHT, x=0, y=1, w=909, h=214, TabPos=0, TopOfStack=1, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Source Files", DockArea=LEFT, x=0, y=0, w=670, h=773, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Disassembly", DockArea=RIGHT, x=0, y=2, w=909, h=263, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Global Data", DockArea=RIGHT, x=0, y=0, w=909, h=294, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Watched Data 1", DockArea=FLOATING, x=205, y=144, w=2126, h=1023, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
-OpenWindow="Data Sampling", DockArea=BOTTOM, x=0, y=0, w=2560, h=488, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, VisibleTab=0, UniformSampleSpacing=0
+OpenWindow="Call Stack", DockArea=RIGHT, x=0, y=1, w=909, h=125, TabPos=1, TopOfStack=0, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Source Files", DockArea=LEFT, x=0, y=0, w=670, h=396, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Disassembly", DockArea=RIGHT, x=0, y=2, w=909, h=125, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Global Data", DockArea=RIGHT, x=0, y=0, w=909, h=125, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Watched Data 1", DockArea=RIGHT, x=0, y=1, w=909, h=125, TabPos=0, TopOfStack=1, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0
+OpenWindow="Data Sampling", DockArea=BOTTOM, x=0, y=0, w=1873, h=451, FilterBarShown=0, TotalValueBarShown=0, ToolBarShown=0, VisibleTab=0, UniformSampleSpacing=0
 SmartViewPlugin="", Page="", Toolbar="Hidden", Window="SmartView 1"
-TableHeader="Global Data", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Location";"Size";"Type";"Access";"Scope"], ColWidths=[100;100;102;100;100;0;798]
 TableHeader="Call Stack", SortCol="Function", SortOrder="ASCENDING", VisibleCols=["Function";"Stack Frame";"Source";"PC";"Return Address";"Stack Used"], ColWidths=[118;144;214;104;154;175]
+TableHeader="Global Data", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Location";"Size";"Type";"Access";"Scope"], ColWidths=[100;100;102;100;100;27;354]
 TableHeader="Data Sampling Table", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time"], ColWidths=[100;100]
-TableHeader="Data Sampling Setup", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Type";"Value";"Min";"Max";"Average";"# Changes";"Min. Change";"Max. Change"], ColWidths=[118;100;100;100;100;100;110;126;1706]
+TableHeader="Data Sampling Setup", SortCol="Max. Change", SortOrder="ASCENDING", VisibleCols=["Expression";"Type";"Value";"Min";"Max";"Average";"# Changes";"Min. Change";"Max. Change"], ColWidths=[118;100;100;100;100;100;110;126;1019]
 TableHeader="Power Sampling", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Index";"Time";"Ch 0"], ColWidths=[100;100;100]
-TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location";"Refresh";"Access"], ColWidths=[522;217;235;1158;100]
+TableHeader="Task List", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Name";"Run Count";"Priority";"Status";"Timeout";"Stack Info";"ID";"Mutex Count";"Notified Value";"Notify State"], ColWidths=[110;110;110;110;110;110;110;110;110;110]
 TableHeader="RegisterSelectionDialog", SortCol="None", SortOrder="ASCENDING", VisibleCols=[], ColWidths=[]
 TableHeader="TargetExceptionDialog", SortCol="Name", SortOrder="ASCENDING", VisibleCols=["Name";"Value";"Description";"Address"], ColWidths=[200;100;340;126]
-TableHeader="Task List", SortCol="None", SortOrder="ASCENDING", VisibleCols=["Name";"Run Count";"Priority";"Status";"Timeout";"Stack Info";"ID";"Mutex Count";"Notified Value";"Notify State"], ColWidths=[110;110;110;110;110;110;110;110;110;110]
 TableHeader="Source Files", SortCol="File", SortOrder="DESCENDING", VisibleCols=["File";"Status";"#Insts";"Size";"Path"], ColWidths=[263;100;100;100;1094]
+TableHeader="Watched Data 1", SortCol="Expression", SortOrder="ASCENDING", VisibleCols=["Expression";"Value";"Location";"Refresh";"Access"], ColWidths=[522;217;235;1126;100]
 WatchedExpression="g_motor_debug_mailbox.unlock_key", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.operation", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.request_sequence", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.completed_sequence", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.position_valid", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.result", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.position_valid", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.position_degrees", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.position_error_degrees", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.sample_count", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.zeroed", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.motion_active", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.last_update_ms", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox", Window=Watched Data 1
-WatchedExpression="status.selected_task", Window=Watched Data 1
-WatchedExpression="this->status_.selected_task", Window=Watched Data 1
-WatchedExpression="this->status_.run_state", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.completed_sequence", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.position_valid", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.result", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.position_degrees", Window=Watched Data 1
-WatchedExpression="this->status_.selected_task", Window=Watched Data 1
-WatchedExpression="this->status_.run_state", Window=Watched Data 1
-WatchedExpression="this->motor_debug_zeroed_", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.operation", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.unlock_key", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.request_sequence", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.completed_sequence", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.target_degrees", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.speed_rpm", Window=Watched Data 1
-WatchedExpression="g_motor_debug_mailbox.acceleration", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.config_valid", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.config_firmware_type", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.config_total_bytes", Window=Watched Data 1
@@ -66,3 +51,54 @@ WatchedExpression="g_motor_debug_mailbox.config_motor_type", Window=Watched Data
 WatchedExpression="g_motor_debug_mailbox.config_microstep", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.config_pulses_per_revolution", Window=Watched Data 1
 WatchedExpression="g_motor_debug_mailbox.config_address", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.config_serial_baud_rate", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.config_checksum_mode", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.config_response_mode", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.config_position_window_tenths_degree", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_tuning_valid", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_angle_offset_degrees", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_position_gain_degrees_per_cm", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_velocity_gain_degrees_per_pixel_s", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_angle_limit_degrees", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_minimum_command_delta_degrees", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.last_update_ms", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_selected", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_run_state", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_fault", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_phase", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_motor_enabled", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_vision_valid", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_elapsed_ms", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_vision_age_ms", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_position_cm", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_confidence", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_reference_cm", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_target_angle_degrees", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_motor_error", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_start_stage", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_start_result", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_command_active", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_command_count", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_last_command_angle_degrees", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_last_command_result", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox", Window=Watched Data 1
+WatchedExpression="status.selected_task", Window=Watched Data 1
+WatchedExpression="this->status_.selected_task", Window=Watched Data 1
+WatchedExpression="this->status_.run_state", Window=Watched Data 1
+WatchedExpression="this->status_.selected_task", Window=Watched Data 1
+WatchedExpression="this->status_.run_state", Window=Watched Data 1
+WatchedExpression="this->motor_debug_zeroed_", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_run_state", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.speed_rpm", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_run_state", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_start_stage", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_run_state", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_min_position_cm", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_run_state", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_run_state", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_rejected_position_cm", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.control_last_command_angle_degrees", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_rejected_duration_ms", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_rejected_duration_ms", Window=Watched Data 1
+WatchedExpression="g_motor_debug_mailbox.task_position_sample_count", Window=Watched Data 1

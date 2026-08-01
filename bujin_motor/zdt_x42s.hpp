@@ -32,6 +32,24 @@ enum class Direction : uint8_t
   CounterClockwise = 0x01,
 };
 
+// FD position-command reference. The values are the wire-format values used
+// by the EMM V5 protocol.
+enum class PositionMode : uint8_t
+{
+  RelativeToPreviousTarget = 0,
+  Absolute = 1,
+  RelativeToCurrentPosition = 2,
+};
+
+// The two supported firmware families share the transport, acknowledgement and
+// several simple commands, but use different encodings for FD position motion
+// and for the value returned by command 36.
+enum class FirmwareFamily : uint8_t
+{
+  Emm,
+  X,
+};
+
 // X42S 单电机串口驱动。
 //
 // 同一 UART 上的命令和响应必须严格一一对应。因此同一时刻应只由一个
@@ -100,6 +118,76 @@ class ZdtX42s
 
   // 将当前编码器位置写为电机零点。调用前应确保机构位于期望的机械零位。
   [[nodiscard]] LibXR::ErrorCode SetCurrentPositionAsZero();
+  [[nodiscard]] LibXR::ErrorCode SetSingleTurnHomingZero(bool save = true);
+  [[nodiscard]] LibXR::ErrorCode TriggerHoming(uint8_t mode = 0,
+                                                bool sync = false);
+  [[nodiscard]] LibXR::ErrorCode InterruptHoming();
+
+  // EMM V5 action commands. ResetMotor and RestoreFactorySettings change the
+  // driver's persistent state; callers must re-establish their application
+  // configuration after they succeed.
+  [[nodiscard]] LibXR::ErrorCode CalibrateEncoder();
+  [[nodiscard]] LibXR::ErrorCode ResetMotor();
+  [[nodiscard]] LibXR::ErrorCode ClearClogProtection();
+  [[nodiscard]] LibXR::ErrorCode RestoreFactorySettings();
+
+  // EMM V5 motion commands. `sync` defers execution until
+  // SynchronizeMotion() is sent to the driver.
+  [[nodiscard]] LibXR::ErrorCode SetVelocity(Direction direction,
+                                              uint16_t speed_rpm,
+                                              uint8_t acceleration,
+                                              bool sync = false);
+  [[nodiscard]] LibXR::ErrorCode MoveToPosition(
+      Direction direction, uint16_t speed_rpm, uint8_t acceleration,
+      uint32_t pulses, PositionMode mode = PositionMode::Absolute,
+      bool sync = false);
+  [[nodiscard]] LibXR::ErrorCode ConfigureQuickPosition(
+      uint16_t speed_rpm, uint8_t acceleration,
+      PositionMode mode = PositionMode::Absolute, bool sync = false);
+  [[nodiscard]] LibXR::ErrorCode MoveQuickPosition(int32_t pulses);
+  [[nodiscard]] LibXR::ErrorCode SynchronizeMotion();
+
+  // Configure the EMM V5 homing behaviour. The values are passed through in
+  // the units specified by the motor manual: RPM, mA and ms.
+  [[nodiscard]] LibXR::ErrorCode ConfigureHoming(
+      bool save, uint8_t mode, Direction direction, uint16_t speed_rpm,
+      uint32_t timeout_ms, uint16_t stall_speed_rpm,
+      uint16_t stall_current_ma, uint16_t stall_time_ms,
+      bool home_on_power_up);
+
+  // Persistent EMM V5 configuration commands. A successful address update is
+  // applied to this instance after the acknowledgement from the old address.
+  [[nodiscard]] LibXR::ErrorCode SetMotorAddress(bool save, uint8_t address);
+  [[nodiscard]] LibXR::ErrorCode SetMicrostep(bool save, uint8_t microstep);
+  [[nodiscard]] LibXR::ErrorCode SetPowerDownFlag(bool enabled);
+  [[nodiscard]] LibXR::ErrorCode SetMotorType(bool save, bool motor_is_1p8_degree);
+  [[nodiscard]] LibXR::ErrorCode SetFirmwareType(bool save, bool x_firmware);
+  [[nodiscard]] LibXR::ErrorCode SetControlMode(bool save, bool closed_loop);
+  [[nodiscard]] LibXR::ErrorCode SetOpenLoopCurrent(bool save, uint16_t current_ma);
+  [[nodiscard]] LibXR::ErrorCode SetClosedLoopCurrent(bool save,
+                                                       uint16_t current_ma);
+  [[nodiscard]] LibXR::ErrorCode SetPid(bool save, uint32_t proportional,
+                                        uint32_t integral, uint32_t derivative);
+  [[nodiscard]] LibXR::ErrorCode SetPositionWindow(bool save,
+                                                    uint16_t tenths_degree);
+  [[nodiscard]] LibXR::ErrorCode SetHeartbeatProtection(bool save,
+                                                         uint32_t timeout_ms);
+
+  // X-firmware FB direct speed-limited absolute-position command. The motor
+  // tracks each new target immediately without planning an acceleration ramp.
+  [[nodiscard]] LibXR::ErrorCode MoveToAbsoluteAngleDirect(
+      float target_angle_degrees, uint16_t speed_limit_rpm,
+      bool wait_for_reached = false, uint32_t reach_timeout_ms = 5000);
+
+  // Reports whether the FB direct-position command is available. Only the X
+  // firmware accepts it; the Emm firmware must use MoveToAbsoluteAngle (FD)
+  // instead. Callers that stream position targets should select their motion
+  // command based on this so they never send a command the motor rejects with
+  // NOT_SUPPORT.
+  [[nodiscard]] bool SupportsDirectPosition() const
+  {
+    return firmware_family_ == FirmwareFamily::X;
+  }
 
   // 以绝对位置模式运动到指定角度。
   //
@@ -115,7 +203,8 @@ class ZdtX42s
   [[nodiscard]] LibXR::ErrorCode ReadRealtimeAngle(float& angle_degrees);
 
   // Reads the configured Emm motor parameters without enabling or moving it.
-  // A valid X-firmware response is drained and reported as NOT_SUPPORT.
+  // A valid response also updates the protocol family atomically. A valid X
+  // response is still reported as NOT_SUPPORT because it has no Emm payload.
   [[nodiscard]] LibXR::ErrorCode ReadMotorConfig(MotorConfigReadback& readback);
 
   // 判断两个角度在圆周意义上是否足够接近。
@@ -127,8 +216,32 @@ class ZdtX42s
  private:
   // 下面的常量为 X42S TTL 协议的功能码和响应状态码。
   static constexpr uint8_t kEnableCommand = 0xF3;
+  static constexpr uint8_t kVelocityCommand = 0xF6;
+  static constexpr uint8_t kQuickPositionParamsCommand = 0xF1;
+  static constexpr uint8_t kQuickPositionCommand = 0xFC;
   static constexpr uint8_t kStopCommand = 0xFE;
+  static constexpr uint8_t kSynchronizeMotionCommand = 0xFF;
+  static constexpr uint8_t kCalibrateEncoderCommand = 0x06;
+  static constexpr uint8_t kResetMotorCommand = 0x08;
   static constexpr uint8_t kSetZeroCommand = 0x0A;
+  static constexpr uint8_t kClearClogProtectionCommand = 0x0E;
+  static constexpr uint8_t kRestoreFactorySettingsCommand = 0x0F;
+  static constexpr uint8_t kSetSingleTurnZeroCommand = 0x93;
+  static constexpr uint8_t kHomingCommand = 0x9A;
+  static constexpr uint8_t kInterruptHomingCommand = 0x9C;
+  static constexpr uint8_t kConfigureHomingCommand = 0x4C;
+  static constexpr uint8_t kSetMotorAddressCommand = 0xAE;
+  static constexpr uint8_t kSetMicrostepCommand = 0x84;
+  static constexpr uint8_t kSetPowerDownFlagCommand = 0x50;
+  static constexpr uint8_t kSetMotorTypeCommand = 0xD7;
+  static constexpr uint8_t kSetFirmwareTypeCommand = 0xD5;
+  static constexpr uint8_t kSetControlModeCommand = 0x46;
+  static constexpr uint8_t kSetOpenLoopCurrentCommand = 0x44;
+  static constexpr uint8_t kSetClosedLoopCurrentCommand = 0x45;
+  static constexpr uint8_t kSetPidCommand = 0x4A;
+  static constexpr uint8_t kSetPositionWindowCommand = 0xD1;
+  static constexpr uint8_t kSetHeartbeatProtectionCommand = 0x68;
+  static constexpr uint8_t kDirectPositionCommand = 0xFB;
   static constexpr uint8_t kPositionCommand = 0xFD;
   static constexpr uint8_t kReadPositionCommand = 0x36;
   static constexpr uint8_t kReadMotorConfigCommand = 0x42;
@@ -151,6 +264,13 @@ class ZdtX42s
   // 发送命令并读取其四字节确认帧，确认状态必须为 kAcknowledged。
   [[nodiscard]] LibXR::ErrorCode SendAndExpectAcknowledgement(
       const uint8_t* frame, size_t size, uint8_t command);
+  [[nodiscard]] LibXR::ErrorCode SendAndAcceptHomingResponse(
+      const uint8_t* frame, size_t size);
+  [[nodiscard]] LibXR::ErrorCode SendSimpleAction(uint8_t command,
+                                                   uint8_t auxiliary_code);
+  [[nodiscard]] LibXR::ErrorCode SendConfigurationCommand(
+      uint8_t command, uint8_t auxiliary_code, bool save,
+      const uint8_t* payload, size_t payload_size);
 
   // 在位置命令确认后读取其四字节到位帧，状态必须为 kReached。
   [[nodiscard]] LibXR::ErrorCode WaitForReached(uint8_t command,
@@ -178,6 +298,10 @@ class ZdtX42s
 
   // 驱动实例的协议和运动换算配置。
   Config config_;
+
+  // The default preserves existing Emm behavior until a verified 42 6C reply
+  // identifies an X-firmware motor.
+  FirmwareFamily firmware_family_ = FirmwareFamily::Emm;
 };
 
 }  // namespace BujinMotor
