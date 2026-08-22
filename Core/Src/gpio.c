@@ -73,8 +73,11 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pins : PA4 PA5 */
   GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  GPIO_InitStruct.Pin = HOMING_BUTTON_Pin;
+  HAL_GPIO_Init(HOMING_BUTTON_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LCD_PWR_Pin LCD_RST_Pin */
   GPIO_InitStruct.Pin = LCD_PWR_Pin|LCD_RST_Pin;
