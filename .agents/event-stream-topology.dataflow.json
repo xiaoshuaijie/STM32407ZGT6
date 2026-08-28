@@ -1,0 +1,268 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "26diansai 事件流拓扑",
+    "locale": "zh-CN",
+    "output": ".agents/event-stream-topology.html",
+    "viewBox": [1280, 900],
+    "quality_profile": "showcase"
+  },
+  "stages": [
+    { "label": "生产者" },
+    { "label": "事件与接入" },
+    { "label": "Topic 与有序处理" },
+    { "label": "状态 / 恢复" },
+    { "label": "消费者" }
+  ],
+  "nodes": [
+    {
+      "id": "vision_camera",
+      "type": "external",
+      "label": "视觉相机",
+      "sublabel": "USART1 / PA9-PA10",
+      "tag": "生产者",
+      "stage": 0,
+      "row": 0,
+      "width": 152,
+      "height": 74
+    },
+    {
+      "id": "operator_buttons",
+      "type": "external",
+      "label": "操作按键",
+      "sublabel": "PA4 · PA5 · PC13",
+      "tag": "生产者",
+      "stage": 0,
+      "row": 3,
+      "width": 152,
+      "height": 74
+    },
+    {
+      "id": "ball_event",
+      "type": "messagebus",
+      "label": "BallMeasurement 事件",
+      "sublabel": "AA 55 · 13 字节 · 校验通过",
+      "tag": "事件",
+      "stage": 1,
+      "row": 0,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "ball_receiver",
+      "type": "backend",
+      "label": "BallReceiver",
+      "sublabel": "按字节顺序解析与重同步",
+      "tag": "有序处理器",
+      "stage": 2,
+      "row": 0,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "ball_topic",
+      "type": "messagebus",
+      "label": "ball_measurement",
+      "sublabel": "LibXR Topic · 接收时刻时间戳",
+      "tag": "Topic",
+      "stage": 2,
+      "row": 1,
+      "width": 152,
+      "yOffset": 20,
+      "height": 82
+    },
+    {
+      "id": "balance_controller",
+      "type": "backend",
+      "label": "BalanceController",
+      "sublabel": "20 ms · 单线程控制循环",
+      "tag": "有序处理器",
+      "stage": 2,
+      "row": 2,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "operator_panel",
+      "type": "backend",
+      "label": "OperatorPanel",
+      "sublabel": "balance_ui 任务 · 正式组未发现",
+      "tag": "消费者组证据边界",
+      "stage": 2,
+      "row": 4,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "ball_mailbox",
+      "type": "database",
+      "label": "BallMailbox",
+      "sublabel": "latest_ · Mutex + Semaphore",
+      "tag": "状态存储",
+      "stage": 3,
+      "row": 0,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "balance_topic",
+      "type": "messagebus",
+      "label": "balance_state",
+      "sublabel": "LibXR Topic · 状态 / 控制量发布",
+      "tag": "Topic",
+      "stage": 3,
+      "row": 2,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "recovery_boundary",
+      "type": "security",
+      "label": "DLQ / 重放路径",
+      "sublabel": "未发现实现 · 仅作证据边界",
+      "tag": "恢复语义未知",
+      "stage": 3,
+      "row": 4,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "motor",
+      "type": "external",
+      "label": "ZDT X42S 电机",
+      "sublabel": "USART3 · 同步命令",
+      "tag": "消费者 / 执行器",
+      "stage": 4,
+      "row": 0,
+      "width": 152,
+      "height": 82
+    },
+    {
+      "id": "operator_surfaces",
+      "type": "frontend",
+      "label": "操作员界面",
+      "sublabel": "LCD + USART2 ball latest/show",
+      "tag": "消费者",
+      "stage": 4,
+      "row": 2,
+      "width": 152,
+      "height": 82
+    }
+  ],
+  "flows": [
+    {
+      "from": "vision_camera",
+      "to": "ball_event",
+      "label": "AA 55 二进制帧",
+      "classification": "USART1 输入",
+      "variant": "emphasis"
+    },
+    {
+      "from": "ball_event",
+      "to": "ball_receiver",
+      "label": "按到达顺序接收",
+      "classification": "帧解析",
+      "variant": "emphasis"
+    },
+    {
+      "from": "ball_receiver",
+      "to": "ball_topic",
+      "label": "Publish(measurement)",
+      "classification": "LibXR Topic",
+      "variant": "emphasis"
+    },
+    {
+      "from": "ball_receiver",
+      "to": "ball_mailbox",
+      "label": "写入最新测量",
+      "classification": "Mutex + Semaphore",
+      "variant": "default"
+    },
+    {
+      "from": "ball_mailbox",
+      "to": "balance_controller",
+      "label": "WaitForUpdate()",
+      "classification": "latest snapshot",
+      "variant": "emphasis"
+    },
+    {
+      "from": "operator_buttons",
+      "to": "operator_panel",
+      "label": "消抖后的按下 / 长按事件",
+      "classification": "GPIO 输入",
+      "variant": "default"
+    },
+    {
+      "from": "operator_panel",
+      "to": "balance_controller",
+      "label": "Select / Run / Homing 请求",
+      "classification": "直接调用",
+      "variant": "default"
+    },
+    {
+      "from": "balance_controller",
+      "to": "balance_topic",
+      "label": "Publish(snapshot)",
+      "classification": "状态 / 控制量",
+      "variant": "emphasis"
+    },
+    {
+      "from": "balance_controller",
+      "to": "motor",
+      "label": "FB / FD 运动命令",
+      "classification": "USART3 · 同步请求响应",
+      "variant": "emphasis"
+    },
+    {
+      "from": "balance_controller",
+      "to": "operator_surfaces",
+      "label": "GetStatus() → LCD",
+      "classification": "直接读取",
+      "variant": "default"
+    },
+    {
+      "from": "balance_controller",
+      "to": "recovery_boundary",
+      "label": "故障 → AbortTask / StopImmediately",
+      "classification": "无 DLQ 投递证据",
+      "variant": "security"
+    },
+    {
+      "from": "balance_topic",
+      "to": "operator_surfaces",
+      "label": "订阅者未在仓库中确认",
+      "classification": "Topic 发布但无订阅注册证据",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "已确认主路径",
+      "items": [
+        "USART1 的 AA 55 帧由 BallReceiver 校验后同时写入 BallMailbox 并发布 ball_measurement",
+        "BalanceController 通过 WaitForUpdate 获取最新测量，以 20 ms 控制周期处理",
+        "控制器发布 balance_state，并独占 USART3 电机命令路径"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "状态与消费",
+      "items": [
+        "BallMailbox 是 latest_ 快照，不是可回溯事件日志",
+        "OperatorPanel 由 balance_ui 任务运行；仓库未显示 broker 级正式消费者组",
+        "LCD 直接读取 BalanceController 状态，USART2 终端读取 BallMailbox 最新值"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "证据边界",
+      "items": [
+        "未发现 Kafka、分区、offset、投递重试或 exactly-once / at-least-once 语义证据",
+        "未发现 DLQ、失败事件持久化或自动重放实现；图中仅保留缺口标记",
+        "balance_state 的 Topic 发布已确认，但仓库内未确认订阅注册"
+      ]
+    }
+  ]
+}

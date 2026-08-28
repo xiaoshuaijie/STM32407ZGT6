@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "26diansai 运行时架构与主数据路径",
+    "locale": "zh-CN",
+    "output": ".agents/26diansai-runtime-architecture.html",
+    "viewBox": [1200, 720],
+    "quality_profile": "showcase"
+  },
+  "components": [
+    {
+      "id": "vision_camera",
+      "type": "external",
+      "label": "视觉相机",
+      "sublabel": "AA 55 帧 / USART1",
+      "tag": "外部生产者",
+      "pos": [40, 320],
+      "size": [150, 70]
+    },
+    {
+      "id": "runtime",
+      "type": "backend",
+      "label": "FreeRTOS + LibXR",
+      "sublabel": "线程 · UART · Topic · 同步原语",
+      "tag": "运行时依赖",
+      "pos": [250, 150],
+      "size": [150, 70]
+    },
+    {
+      "id": "ball_receiver",
+      "type": "backend",
+      "label": "BallReceiver",
+      "sublabel": "maxican_rx · 顺序解析",
+      "tag": "视觉接入",
+      "pos": [250, 320],
+      "size": [150, 70]
+    },
+    {
+      "id": "ball_topic",
+      "type": "messagebus",
+      "label": "ball_measurement",
+      "sublabel": "LibXR Topic",
+      "tag": "已确认发布",
+      "pos": [460, 150],
+      "size": [150, 70]
+    },
+    {
+      "id": "ball_mailbox",
+      "type": "database",
+      "label": "BallMailbox",
+      "sublabel": "latest_ 快照",
+      "tag": "状态存储",
+      "pos": [460, 320],
+      "size": [150, 70]
+    },
+    {
+      "id": "balance_controller",
+      "type": "backend",
+      "label": "BalanceController",
+      "sublabel": "balance_ctrl · 20 ms",
+      "tag": "主控制处理器",
+      "pos": [670, 320],
+      "size": [150, 70]
+    },
+    {
+      "id": "balance_topic",
+      "type": "messagebus",
+      "label": "balance_state",
+      "sublabel": "LibXR Topic",
+      "tag": "已确认发布",
+      "pos": [900, 150],
+      "size": [150, 70]
+    },
+    {
+      "id": "operator_panel",
+      "type": "backend",
+      "label": "OperatorPanel",
+      "sublabel": "balance_ui · 按键 / LCD",
+      "tag": "界面任务",
+      "pos": [670, 500],
+      "size": [150, 70]
+    },
+    {
+      "id": "motor",
+      "type": "external",
+      "label": "ZDT X42S 电机",
+      "sublabel": "USART3 执行器",
+      "tag": "外部执行器",
+      "pos": [900, 320],
+      "size": [150, 70]
+    },
+    {
+      "id": "lcd",
+      "type": "frontend",
+      "label": "1.14 英寸 LCD",
+      "sublabel": "状态 / 新鲜度 / 故障",
+      "tag": "本地消费者",
+      "pos": [900, 500],
+      "size": [150, 70]
+    },
+    {
+      "id": "terminal",
+      "type": "external",
+      "label": "USART2 终端",
+      "sublabel": "ball latest / show",
+      "tag": "外部观测者",
+      "pos": [460, 500],
+      "size": [150, 70]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "STM32F407 固件控制域",
+      "wraps": [
+        "runtime",
+        "ball_receiver",
+        "ball_topic",
+        "ball_mailbox",
+        "balance_controller",
+        "balance_topic",
+        "operator_panel",
+        "lcd"
+      ],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "串行外设 / 操作员信任边界",
+      "wraps": ["vision_camera", "motor", "terminal"],
+      "pad": 24
+    }
+  ],
+  "connections": [
+    {
+      "id": "vision-to-receiver",
+      "from": "vision_camera",
+      "to": "ball_receiver",
+      "label": "AA 55 视觉帧",
+      "variant": "emphasis",
+      "labelDy": -52
+    },
+    {
+      "id": "receiver-to-mailbox",
+      "from": "ball_receiver",
+      "to": "ball_mailbox",
+      "label": "校验通过 → latest_",
+      "variant": "emphasis",
+      "labelDy": -52
+    },
+    {
+      "id": "receiver-to-topic",
+      "from": "ball_receiver",
+      "to": "ball_topic",
+      "label": "Publish(measurement)",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [[325, 270], [535, 270]],
+      "labelAt": [430, 270]
+    },
+    {
+      "id": "mailbox-to-controller",
+      "from": "ball_mailbox",
+      "to": "balance_controller",
+      "label": "WaitForUpdate()",
+      "variant": "emphasis",
+      "labelDy": -52
+    },
+    {
+      "id": "controller-to-motor",
+      "from": "balance_controller",
+      "to": "motor",
+      "label": "FB / FD 运动命令",
+      "variant": "emphasis",
+      "labelDy": -52
+    },
+    {
+      "id": "controller-to-state-topic",
+      "from": "balance_controller",
+      "to": "balance_topic",
+      "label": "Publish(snapshot)",
+      "variant": "emphasis",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [[745, 270], [975, 270]],
+      "labelAt": [850, 270]
+    },
+    {
+      "id": "operator-to-controller",
+      "from": "operator_panel",
+      "to": "balance_controller",
+      "label": "任务选择 / 启停请求",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "labelAt": [650, 445]
+    },
+    {
+      "id": "controller-to-lcd",
+      "from": "balance_controller",
+      "to": "lcd",
+      "label": "GetStatus() → 渲染",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "via": [[745, 450], [975, 450]],
+      "labelAt": [850, 450]
+    },
+    {
+      "id": "mailbox-to-terminal",
+      "from": "ball_mailbox",
+      "to": "terminal",
+      "label": "GetLatest()",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [535, 445]
+    },
+    {
+      "id": "runtime-to-receiver",
+      "from": "runtime",
+      "to": "ball_receiver",
+      "label": "线程 / UART 原语",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [375, 245]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "主数据路径",
+      "items": [
+        "视觉相机经 USART1 输入 AA 55 帧，BallReceiver 校验并按到达顺序解析",
+        "有效测量同时发布到 ball_measurement，并覆盖 BallMailbox 的 latest_ 快照",
+        "BalanceController 每 20 ms 取最新样本，向 ZDT X42S 发出 USART3 运动命令"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "所有权与信任边界",
+      "items": [
+        "STM32F407 固件控制域包含接入、状态、控制器、Topic 与本地 LCD",
+        "BalanceController 是仓库中唯一被明确说明可通过 USART3 发电机命令的线程",
+        "相机、电机和 USART2 终端位于串行外设 / 操作员边界之外"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "未推断的语义",
+      "items": [
+        "未发现 Kafka/分区/offset、正式消费者组、重试投递或 exactly-once / at-least-once 证据",
+        "未发现 DLQ、失败事件持久化或重放实现；两个 Topic 的 Publish 已确认，订阅注册未确认",
+        "LCD 直接读取 BalanceController 状态，USART2 终端直接读取 BallMailbox 最新值"
+      ]
+    }
+  ]
+}
