@@ -235,6 +235,12 @@ cmake --build build/Release --target 26diansai --parallel 4
 
 ---
 
+## 架构图演示
+
+使用浏览器打开 [26diansai 运行时架构图](.agents/26diansai-runtime-architecture.html) 查看交互式 Archify 架构图。
+
+---
+
 ## 相关文档
 
 - `bu_task/README.md` — 平衡任务流程、按键、终端命令与调参说明
